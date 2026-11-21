@@ -146,6 +146,16 @@ input.cell{width:100px;text-align:right;padding:6px 8px}
 .modal .mf{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:9px;font-weight:500;font-size:14px;z-index:60;box-shadow:var(--shadow);max-width:90vw}
 .toast.bad{background:var(--bad);color:#fff}
+.pivot tr.grp td{background:var(--surface-2)}
+.pivot td.n,.pivot td:nth-child(2){white-space:nowrap}
+.pivot tr.l0 td{background:var(--accent-soft);border-top:2px solid var(--line)}
+.pivot tr.l0 .gl{font-family:var(--display);font-weight:700;font-size:15px}
+.pivot tr.l1 .gl{font-weight:700}
+.pivot tr.l2 td{background:var(--surface)} .pivot tr.l2 .gl{font-weight:600}
+.pivot tr.tot td{background:var(--surface-2);border-top:2px solid var(--ink)}
+.pivot tr.leaf td{background:var(--surface)}
+.tg{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:0;cursor:pointer;text-align:left;color:inherit}
+.car{display:inline-block;width:14px;transition:transform .15s;color:var(--muted)} .car.open{transform:rotate(90deg)}
 .receipt{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px dashed var(--line);border-radius:8px;padding:14px;white-space:pre-wrap}
 .muted{color:var(--muted)} .small{font-size:13px}
 .right{margin-left:auto}
@@ -259,7 +269,7 @@ const S = {
 let db = null;
 const UI = {
   view:'dashboard',
-  prodSearch:'', prodCat:'', prodStatus:'',
+  prodSearch:'', prodCat:'', prodStatus:'', prodView:'tree', open:new Set(),
   basket:[], saleSearch:'', payMethod:'cash', saleCust:'', saleRef:'', tendered:'', lastSale:null,
   stockIn:{supplier:'', invoice:'', date:today(), lines:[]}, siSearch:'',
   count:{}, countCat:'', countSearch:'',
@@ -418,7 +428,8 @@ function findProducts(q, limit=8){
   const all = activeProducts();
   const exact = all.filter(p=>(p.sku||'').toLowerCase()===q);
   if(exact.length) return exact;
-  return all.filter(p=>p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q)).slice(0,limit);
+  const words = q.split(/\s+/);
+  return all.filter(p=>{ const hay = [p.name,p.sku,p.category,p.brand,p.variant,p.size].join(' ').toLowerCase(); return words.every(w=>hay.includes(w)); }).slice(0,limit);
 }
 function basketTotal(){ return sum(UI.basket, l=>num(l.qty)*num(l.price)); }
 RENDER.sell = () => {
@@ -475,28 +486,104 @@ AFTER.sell = () => {
 };
 
 /* ---------- Products ---------- */
+/* Pivot-style grouping: Category › Brand › Flavour/Variant › Size */
+function sizeVal(x){
+  const m = String(x||'').toLowerCase().replace(',', '.').match(/([\d.]+)\s*(ml|cl|ltr|litres?|l|kg|g|pcs|pc|pack|pk|s)?\b/);
+  if(!m) return 1e12; let v = parseFloat(m[1]); const u = m[2]||'';
+  if(/^(l|ltr|litre|litres)$/.test(u) || u==='kg') v *= 1000; else if(u==='cl') v *= 10;
+  return v;
+}
+const NOBRAND = 'No brand', STD = 'Standard';
+const keyOf = (...parts) => parts.join('›');
+function prodAgg(list){
+  return { n:list.length, stock:sum(list,p=>num(p.stock)), value:sum(list,p=>Math.max(0,p.value)), sold:sum(list,p=>p.sold30),
+    rev:sum(list,p=>p.sold30*num(p.price)), low:list.filter(p=>p.status==='low').length, out:list.filter(p=>p.status==='out').length,
+    units:[...new Set(list.map(p=>p.unit).filter(Boolean))] };
+}
+function buildTree(rows){
+  const root = new Map();
+  rows.forEach(p=>{
+    const c = p.category||'Uncategorised', b = p.brand||NOBRAND, v = p.variant||STD;
+    if(!root.has(c)) root.set(c,new Map()); const cm = root.get(c);
+    if(!cm.has(b)) cm.set(b,new Map()); const bm = cm.get(b);
+    if(!bm.has(v)) bm.set(v,[]); bm.get(v).push(p);
+  });
+  const sortMap = m => new Map([...m.entries()].sort((x,y)=> (x[0]===NOBRAND||x[0]===STD?1:0)-(y[0]===NOBRAND||y[0]===STD?1:0) || x[0].localeCompare(y[0])));
+  const out = sortMap(root);
+  out.forEach((cm,c)=>{ const scm = sortMap(cm); out.set(c, scm); scm.forEach((bm,b)=>{ const sbm = sortMap(bm); scm.set(b, sbm); sbm.forEach(list=>list.sort((x,y)=>sizeVal(x.size)-sizeVal(y.size) || x.name.localeCompare(y.name))); }); });
+  return out;
+}
+function alertPills(a){ return (a.out?`<span class="pill bad">${a.out} out</span> `:'') + (a.low?`<span class="pill warn">${a.low} low</span>`:'') || '<span class="pill ok">OK</span>'; }
+function groupRow(level, label, a, key, open, sub){
+  const pad = 8 + level*22;
+  return `<tr class="grp l${level}"><td style="padding-left:${pad}px"><button class="tg" data-act="tg" data-k="${esc(key)}" aria-expanded="${open}" aria-label="${open?'Collapse':'Expand'} ${esc(label)}"><span class="car ${open?'open':''}">▸</span><span class="gl">${esc(label)}</span></button><span class="meta" style="padding-left:22px">${sub}</span></td>
+    <td>${alertPills(a)}</td><td class="n">${qtyf(a.stock)}${a.units.length===1?' <span class="muted small">'+esc(a.units[0])+'</span>':''}</td><td class="n">${kes(a.value)}</td><td class="n">${qtyf(a.sold)}</td><td class="n">${kes(a.rev)}</td><td></td></tr>`;
+}
+function leafRow(p, level){
+  const m = num(p.price)>0 ? (num(p.price)-num(p.cost))/num(p.price)*100 : 0;
+  const label = p.size || p.name;
+  return `<tr class="leaf"><td style="padding-left:${8+level*22+22}px"><b>${esc(label)}</b><span class="meta">${p.size?esc(p.name)+' · ':''}${p.sku?esc(p.sku)+' · ':''}Buy ${kes2(p.cost)} · Sell ${kes2(p.price)} · <span style="${m<5?'color:var(--bad)':''}">${Math.round(m)}%</span>${p.tracksExpiry?' · expiry':''}</span></td>
+    <td>${statusPill(p.status)}${p.dead?' <span class="pill mute">Slow</span>':''}${num(p.stock)<0?' <span class="pill bad">Recount</span>':''}</td>
+    <td class="n"><b>${qtyf(p.stock)}</b> <span class="muted small">${esc(p.unit||'')}</span><span class="meta">${p.cover===Infinity?'':Math.floor(p.cover)+' days left'}</span></td><td class="n">${kes(Math.max(0,p.value))}</td><td class="n">${qtyf(p.sold30)}</td><td class="n">${kes(p.sold30*num(p.price))}</td>
+    <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="adjust" data-id="${p.id}" ${dis()}>Adjust</button> <button class="btn sm" data-act="edit-product" data-id="${p.id}" ${dis()}>Edit</button></td></tr>`;
+}
+function treeTable(rows){
+  const tree = buildTree(rows); const forceOpen = !!UI.prodSearch.trim();
+  const isOpen = k => forceOpen || UI.open.has(k);
+  let h = '';
+  const plural = (n,w) => n+' '+w+(n===1?'':'s');
+  tree.forEach((cm, c) => {
+    const cl = [...cm.values()].flatMap(bm=>[...bm.values()].flat()); const ck = keyOf(c); const co = isOpen(ck);
+    h += groupRow(0, c, prodAgg(cl), ck, co, `${plural(cm.size,'brand')} · ${plural(cl.length,'item')}`);
+    if(!co) return;
+    cm.forEach((bm, b) => {
+      const bl = [...bm.values()].flat(); const bk = keyOf(c,b); const bo = isOpen(bk);
+      const onlyStd = bm.size===1 && bm.has(STD);
+      h += groupRow(1, b, prodAgg(bl), bk, bo, onlyStd ? plural(bl.length,'size') : `${plural(bm.size, 'flavour')} · ${plural(bl.length,'size')}`);
+      if(!bo) return;
+      if(onlyStd){ bm.get(STD).forEach(p=>{ h += leafRow(p, 1); }); return; }
+      bm.forEach((list, v) => {
+        const vk = keyOf(c,b,v); const vo = isOpen(vk);
+        h += groupRow(2, v, prodAgg(list), vk, vo, plural(list.length,'size'));
+        if(vo) list.forEach(p=>{ h += leafRow(p, 2); });
+      });
+    });
+  });
+  const tot = prodAgg(rows);
+  h += `<tr class="grp tot"><td><b>Grand total</b><span class="meta">${plural(rows.length,'item')}</span></td><td>${alertPills(tot)}</td><td class="n"><b>${qtyf(tot.stock)}</b></td><td class="n"><b>${kes(tot.value)}</b></td><td class="n"><b>${qtyf(tot.sold)}</b></td><td class="n"><b>${kes(tot.rev)}</b></td><td></td></tr>`;
+  return `<div class="tw"><table class="pivot"><thead><tr><th>Category › Brand › Flavour › Size</th><th>Alerts</th><th class="n">In stock</th><th class="n">Stock value</th><th class="n">Sold (30 days)</th><th class="n">Sales (30 days)</th><th></th></tr></thead><tbody>${h}</tbody></table></div>`;
+}
+function allGroupKeys(rows){
+  const ks = []; buildTree(rows).forEach((cm,c)=>{ ks.push(keyOf(c)); cm.forEach((bm,b)=>{ ks.push(keyOf(c,b)); bm.forEach((l,v)=>ks.push(keyOf(c,b,v))); }); }); return ks;
+}
+function productRows(){
+  const an = analyse(); const q = UI.prodSearch.toLowerCase();
+  return an.filter(p=>(!q || [p.name,p.sku,p.supplier,p.brand,p.variant,p.size].some(x=>(x||'').toLowerCase().includes(q))) && (!UI.prodCat || p.category===UI.prodCat) && (!UI.prodStatus || (UI.prodStatus==='attention'?p.status!=='ok':UI.prodStatus==='dead'?p.dead:p.status===UI.prodStatus)));
+}
 RENDER.products = () => {
   const an = analyse(); const cats = [...new Set(an.map(p=>p.category).filter(Boolean))].sort();
-  const q = UI.prodSearch.toLowerCase();
-  const rows = an.filter(p=>(!q || p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.supplier||'').toLowerCase().includes(q)) && (!UI.prodCat || p.category===UI.prodCat) && (!UI.prodStatus || (UI.prodStatus==='attention'?p.status!=='ok':UI.prodStatus==='dead'?p.dead:p.status===UI.prodStatus)));
+  const rows = productRows();
   const archived = Object.values(S.products).filter(p=>p.archived).length;
+  const tree = UI.prodView==='tree';
+  const list = rows.length ? rows.map(p=>{ const m = num(p.price)>0 ? (num(p.price)-num(p.cost))/num(p.price)*100 : 0;
+      return `<tr><td><b>${esc(p.name)}</b><span class="meta">${[p.sku,p.category,p.brand,p.supplier].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}${p.tracksExpiry?' · <span class="pill mute" style="padding:0 6px">expiry</span>':''}</span></td>
+      <td>${statusPill(p.status)}${p.dead?' <span class="pill mute">Slow</span>':''}${num(p.stock)<0?' <span class="pill bad">Recount</span>':''}</td>
+      <td class="n"><b>${qtyf(p.stock)}</b> <span class="muted small">${esc(p.unit||'')}</span></td><td class="n">${kes2(p.cost)}</td><td class="n">${kes2(p.price)}</td>
+      <td class="n" style="${m<5?'color:var(--bad)':''}">${Math.round(m)}%</td><td class="n">${p.avg?p.avg.toFixed(1):'–'}</td><td class="n">${p.cover===Infinity?'–':Math.floor(p.cover)}</td><td class="n">${qtyf(p.reorder)}</td>
+      <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="adjust" data-id="${p.id}" ${dis()}>Adjust</button> <button class="btn sm" data-act="edit-product" data-id="${p.id}" ${dis()}>Edit</button></td></tr>`; }).join('') : '';
+  const empty = `<p class="empty">${an.length?'No products match these filters.':'No products yet. Add one, or import a CSV list.'}</p>`;
   return head('Products', `${an.length} products · stock value ${kes(sum(an,p=>Math.max(0,p.value)))} at cost`,
     `<button class="btn" data-act="import-csv" ${dis()}>Import CSV</button><button class="btn" data-act="export-products">${icon('down')} Export</button><button class="btn pri" data-act="edit-product" ${dis()}>${icon('plus')} Add product</button>`) +
   `<div class="card">
     <div class="row" style="margin-bottom:12px">
-      <input type="search" id="prod-search" placeholder="Search name, barcode or supplier" value="${esc(UI.prodSearch)}" style="max-width:300px" aria-label="Search products">
+      <div class="seg" role="group" aria-label="View"><button type="button" class="${tree?'on':''}" data-act="pview" data-v="tree">Grouped</button><button type="button" class="${tree?'':'on'}" data-act="pview" data-v="list">List</button></div>
+      <input type="search" id="prod-search" placeholder="Search name, brand, flavour, size, barcode" value="${esc(UI.prodSearch)}" style="max-width:300px" aria-label="Search products">
       <select id="prod-cat" style="max-width:190px" aria-label="Category"><option value="">All categories</option>${cats.map(c=>`<option ${UI.prodCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <select id="prod-status" style="max-width:190px" aria-label="Status"><option value="">Any status</option><option value="attention" ${UI.prodStatus==='attention'?'selected':''}>Needs reorder</option><option value="out" ${UI.prodStatus==='out'?'selected':''}>Out of stock</option><option value="dead" ${UI.prodStatus==='dead'?'selected':''}>Slow / dead stock</option></select>
+      ${tree?`<button class="btn sm" data-act="expand-all">Expand all</button><button class="btn sm" data-act="collapse-all">Collapse all</button>`:''}
       <span class="small muted right">${rows.length} shown${archived?` · ${archived} archived`:''}</span>
     </div>
-    <div class="tw"><table><thead><tr><th>Product</th><th>Status</th><th class="n">In stock</th><th class="n">Buy</th><th class="n">Sell</th><th class="n">Margin</th><th class="n">Sold/day</th><th class="n">Days left</th><th class="n">Reorder at</th><th></th></tr></thead><tbody>
-    ${rows.length?rows.map(p=>{ const m = num(p.price)>0 ? (num(p.price)-num(p.cost))/num(p.price)*100 : 0;
-      return `<tr><td><b>${esc(p.name)}</b><span class="meta">${[p.sku,p.category,p.supplier].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}${p.tracksExpiry?' · <span class="pill mute" style="padding:0 6px">expiry</span>':''}</span></td>
-      <td>${statusPill(p.status)}${p.dead?' <span class="pill mute">Slow</span>':''}${num(p.stock)<0?' <span class="pill bad">Recount</span>':''}</td>
-      <td class="n"><b>${qtyf(p.stock)}</b> <span class="muted small">${esc(p.unit||'')}</span></td><td class="n">${kes2(p.cost)}</td><td class="n">${kes2(p.price)}</td>
-      <td class="n" style="${m<5?'color:var(--bad)':''}">${Math.round(m)}%</td><td class="n">${p.avg?p.avg.toFixed(1):'–'}</td><td class="n">${p.cover===Infinity?'–':Math.floor(p.cover)}</td><td class="n">${qtyf(p.reorder)}</td>
-      <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="adjust" data-id="${p.id}" ${dis()}>Adjust</button> <button class="btn sm" data-act="edit-product" data-id="${p.id}" ${dis()}>Edit</button></td></tr>`; }).join('') : `<tr><td colspan="10"><p class="empty">${an.length?'No products match these filters.':'No products yet. Add one, or import a CSV list.'}</p></td></tr>`}
-    </tbody></table></div>
+    ${!rows.length ? empty : tree ? treeTable(rows) : `<div class="tw"><table><thead><tr><th>Product</th><th>Status</th><th class="n">In stock</th><th class="n">Buy</th><th class="n">Sell</th><th class="n">Margin</th><th class="n">Sold/day</th><th class="n">Days left</th><th class="n">Reorder at</th><th></th></tr></thead><tbody>${list}</tbody></table></div>`}
   </div>
   <input type="file" id="csv-file" accept=".csv,text/csv" class="hide">`;
 };
@@ -712,10 +799,10 @@ RENDER['shop-settings'] = () => {
       <div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><input type="text" id="staff-email" placeholder="name@gmail.com" aria-label="Staff Google email"><input type="text" id="staff-name" placeholder="Name (optional)" aria-label="Staff name" style="max-width:160px"><button class="btn pri" data-act="add-staff">Add</button></div>
       <div class="list">${Object.values(S.staff).sort((a,b)=>(a.role==='owner'?-1:1)-(b.role==='owner'?-1:1)||a.id.localeCompare(b.id)).map(m=>`<div class="li"><div class="l"><b>${esc(m.name||m.id.split('@')[0])}</b><span>${esc(m.id)}</span></div><div class="r">${m.role==='owner'?'<span class="pill acc">Owner</span>':`<button class="btn sm danger" data-act="rm-staff" data-id="${esc(m.id)}">Remove</button>`}</div></div>`).join('')}</div></div>`:''}
     <div class="card"><h2 style="margin-bottom:8px">CSV import format</h2>
-      <p class="small muted">On the Products page, Import CSV accepts these columns (first row is the header). Rows with a barcode/SKU that already exists update that product.</p>
-      <div class="receipt">name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry
-Sugar 1kg,6161100410013,Groceries,pkt,145,165,40,15,3,Mumias Dist.,no
-Fresh Milk 500ml,6164001234567,Dairy,pkt,52,60,48,24,1,Brookside,yes</div>
+      <p class="small muted">On the Products page, Import CSV accepts these columns (first row is the header). Brand, variant (flavour) and size drive the Grouped view. Rows with a barcode/SKU that already exists update that product.</p>
+      <div class="receipt">name,sku,category,brand,variant,size,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry
+Captain Morgan Spiced Gold 750ml,SP-001,Spirits,Captain Morgan,Spiced Gold,750ml,bottle,1450,1750,12,4,3,Spirits distributor,no
+Sugar 1kg,DK-001,Groceries,Mumias,,1kg,pkt,145,165,40,15,3,Mumias Dist.,no</div>
       <button class="btn sm" data-act="copy-template" style="margin-top:10px">Copy template</button>
     </div>
   </div>`;
@@ -832,12 +919,17 @@ function productForm(id){
   const p = id ? S.products[id] : {unit:'pcs', leadDays:2, reorder:5, stock:0};
   const cats = [...new Set(Object.values(S.products).map(x=>x.category).filter(Boolean))].sort();
   const sups = [...new Set(Object.values(S.products).map(x=>x.supplier).filter(Boolean))].sort();
+  const uniq = f => [...new Set(Object.values(S.products).map(f).filter(Boolean))].sort();
+  const brands = uniq(x=>x.brand), variants = uniq(x=>x.variant), sizes = uniq(x=>x.size).sort((a,b)=>sizeVal(a)-sizeVal(b));
   openModal(`<h2>${id?'Edit product':'Add product'}</h2>
   <form id="pf" class="grid" style="gap:12px">
     <div class="fgrid">
-      <div class="field" style="grid-column:1/-1"><label for="pf-name">Product name</label><input type="text" id="pf-name" required value="${esc(p.name||'')}" placeholder="e.g. Kimbo 1kg"></div>
+      <div class="field" style="grid-column:1/-1"><label for="pf-name">Product name</label><input type="text" id="pf-name" required value="${esc(p.name||'')}" placeholder="Fills in from Brand + Flavour + Size"></div>
       <div class="field"><label for="pf-sku">Barcode / SKU</label><input type="text" id="pf-sku" value="${esc(p.sku||'')}"></div>
       <div class="field"><label for="pf-cat">Category</label><input type="text" id="pf-cat" list="pf-cats" value="${esc(p.category||'')}" placeholder="e.g. Groceries"><datalist id="pf-cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="field"><label for="pf-brand">Brand</label><input type="text" id="pf-brand" list="pf-brands" value="${esc(p.brand||'')}" placeholder="e.g. Captain Morgan"><datalist id="pf-brands">${brands.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="field"><label for="pf-var">Flavour / variant</label><input type="text" id="pf-var" list="pf-vars" value="${esc(p.variant||'')}" placeholder="e.g. Spiced Gold"><datalist id="pf-vars">${variants.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="field"><label for="pf-size">Size</label><input type="text" id="pf-size" list="pf-sizes" value="${esc(p.size||'')}" placeholder="e.g. 750ml"><datalist id="pf-sizes">${sizes.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
       <div class="field"><label for="pf-unit">Unit</label><input type="text" id="pf-unit" value="${esc(p.unit||'')}" placeholder="pcs, pkt, kg, bottle"></div>
       <div class="field"><label for="pf-cost">Buying price (KES)</label><input type="number" step="any" min="0" id="pf-cost" value="${esc(p.cost??'')}"></div>
       <div class="field"><label for="pf-price">Selling price (KES)</label><input type="number" step="any" min="0" id="pf-price" value="${esc(p.price??'')}"></div>
@@ -852,13 +944,18 @@ function productForm(id){
   </form>`);
   const mg = ()=>{ const c=num($('#pf-cost').value), pr=num($('#pf-price').value); $('#pf-margin').textContent = pr? `Margin ${Math.round((pr-c)/pr*100)}% · KES ${kes2(pr-c)} profit per unit` : ''; };
   $('#pf-cost').oninput = mg; $('#pf-price').oninput = mg; mg();
+  // Build the name from Brand + Flavour + Size until the user types their own name
+  const built = () => [$('#pf-brand').value, $('#pf-var').value, $('#pf-size').value].map(x=>x.trim()).filter(Boolean).join(' ');
+  let auto = !p.name || p.name === [p.brand,p.variant,p.size].filter(Boolean).join(' ');
+  $('#pf-name').addEventListener('input', ()=>{ auto = !$('#pf-name').value.trim(); });
+  ['#pf-brand','#pf-var','#pf-size'].forEach(sel=>$(sel).addEventListener('input', ()=>{ if(auto) $('#pf-name').value = built(); }));
   if(id) $('#pf-arch').onclick = ()=>guarded(async()=>{ await upd('products/'+id, {archived:!p.archived}); closeModal(); toast(p.archived?'Product restored.':'Product archived. It no longer shows in lists.'); });
   $('#pf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
     const name = $('#pf-name').value.trim(); if(!name){ toast('Enter a product name.', true); return; }
     const sku = $('#pf-sku').value.trim();
     const dup = sku && Object.values(S.products).find(x=>x.sku===sku && x.id!==id);
     if(dup){ toast(`Barcode ${sku} is already used by ${dup.name}.`, true); return; }
-    const data = { name, sku, category:$('#pf-cat').value.trim(), unit:$('#pf-unit').value.trim(), cost:num($('#pf-cost').value), price:num($('#pf-price').value),
+    const data = { name, sku, category:$('#pf-cat').value.trim(), brand:$('#pf-brand').value.trim(), variant:$('#pf-var').value.trim(), size:$('#pf-size').value.trim(), unit:$('#pf-unit').value.trim(), cost:num($('#pf-cost').value), price:num($('#pf-price').value),
       reorder:num($('#pf-reorder').value), leadDays:num($('#pf-lead').value), supplier:$('#pf-sup').value.trim(), tracksExpiry:$('#pf-exp').checked };
     if(id) await upd('products/'+id, data);
     else { const ref = db.collection('products').doc(); await retry(()=>ref.set({...data, id:ref.id, stock:num($('#pf-stock').value), created:Date.now(), archived:false})); }
@@ -983,13 +1080,13 @@ async function importCSV(file){
     const name = get(r,'name'); if(!name) continue;
     const sku = get(r,'sku')||get(r,'barcode')||'';
     const data = {name};
-    [['category','category'],['unit','unit'],['supplier','supplier']].forEach(([k,c])=>{ const v=get(r,c); if(v!==undefined) data[k]=v; });
+    [['category','category'],['brand','brand'],['variant','variant'],['variant','flavour'],['size','size'],['unit','unit'],['supplier','supplier']].forEach(([k,c])=>{ const v=get(r,c); if(v!==undefined) data[k]=v; });
     [['cost','cost'],['price','price'],['reorder','reorder'],['leadDays','leaddays']].forEach(([k,c])=>{ const v=get(r,c); if(v!==undefined && v!=='') data[k]=num(v); });
     const te = get(r,'tracksexpiry'); if(te!==undefined) data.tracksExpiry = /^(y|yes|true|1)$/i.test(te);
     const ex = (sku && Object.values(S.products).find(p=>p.sku===sku)) || Object.values(S.products).find(p=>p.name.toLowerCase()===name.toLowerCase());
     const st = get(r,'stock');
     if(ex){ if(st!==undefined && st!=='') data.stock = num(st); await upd('products/'+ex.id, {...data, sku:sku||ex.sku||''}); updated++; }
-    else { const ref = db.collection('products').doc(); await retry(()=>ref.set({unit:'pcs',category:'',supplier:'',cost:0,price:0,reorder:5,leadDays:2,tracksExpiry:false, ...data, sku, id:ref.id, stock:num(st), created:Date.now(), archived:false})); added++; }
+    else { const ref = db.collection('products').doc(); await retry(()=>ref.set({unit:'pcs',category:'',brand:'',variant:'',size:'',supplier:'',cost:0,price:0,reorder:5,leadDays:2,tracksExpiry:false, ...data, sku, id:ref.id, stock:num(st), created:Date.now(), archived:false})); added++; }
   }
   toast(`Import done: ${added} added, ${updated} updated.`);
 }
@@ -1046,6 +1143,10 @@ document.addEventListener('click', e => {
   e.preventDefault();
   switch(a){
     case 'add-item': addToBasket(id); break;
+    case 'tg': { const k = t.dataset.k; if(UI.open.has(k)) UI.open.delete(k); else UI.open.add(k); schedule(); break; }
+    case 'pview': UI.prodView = t.dataset.v; schedule(); break;
+    case 'expand-all': allGroupKeys(productRows()).forEach(k=>UI.open.add(k)); schedule(); break;
+    case 'collapse-all': UI.open.clear(); schedule(); break;
     case 'rm-item': UI.basket.splice(+t.dataset.i,1); schedule(); break;
     case 'clear-basket': UI.basket=[]; schedule(); break;
     case 'pay': UI.payMethod=t.dataset.m; schedule(); break;
@@ -1062,7 +1163,7 @@ document.addEventListener('click', e => {
     case 'writeoff': writeOffForm(id); break;
     case 'add-batch': batchForm(id, num(t.dataset.q)); break;
     case 'import-csv': $('#csv-file').click(); break;
-    case 'export-products': { const an = analyse(); offerFile(`products-${today()}.csv`, toCSV([['name','sku','category','unit','cost','price','stock','reorder','leadDays','supplier','tracksExpiry','status','soldLast30Days','stockValue'], ...an.map(p=>[p.name,p.sku,p.category,p.unit,p.cost,p.price,p.stock,p.reorder,p.leadDays,p.supplier,p.tracksExpiry?'yes':'no',p.status,p.sold30,p.value])])); break; }
+    case 'export-products': { const an = analyse(); offerFile(`products-${today()}.csv`, toCSV([['name','sku','category','brand','variant','size','unit','cost','price','stock','reorder','leadDays','supplier','tracksExpiry','status','soldLast30Days','stockValue'], ...an.map(p=>[p.name,p.sku,p.category,p.brand||'',p.variant||'',p.size||'',p.unit,p.cost,p.price,p.stock,p.reorder,p.leadDays,p.supplier,p.tracksExpiry?'yes':'no',p.status,p.sold30,p.value])])); break; }
     case 'si-add': { const p=S.products[id]; if(!UI.stockIn.lines.find(l=>l.pid===id)) UI.stockIn.lines.push({pid:id, name:p.name, qty:'', cost:p.cost||'', expiry:''}); UI.siSearch=''; const s=$('#si-search'); if(s) s.value=''; schedule(); setTimeout(()=>{ const i=UI.stockIn.lines.findIndex(l=>l.pid===id); $('#sil-q-'+i)?.focus(); },40); break; }
     case 'si-rm': UI.stockIn.lines.splice(+t.dataset.i,1); schedule(); break;
     case 'si-clear': UI.stockIn.lines=[]; schedule(); break;
@@ -1077,11 +1178,11 @@ document.addEventListener('click', e => {
     case 'export-all': offerFile(`duka-backup-${today()}.json`, JSON.stringify({exported:new Date().toISOString(), settings:S.settings, products:Object.values(S.products), batches:Object.values(S.batches), customers:Object.values(S.customers), sales:S.sales, receipts:S.receipts, adjustments:S.adjustments, payments:S.payments, stocktakes:S.stocktakes, summaries:S.summaries}, null, 1)); break;
     case 'archive': guarded(archiveOld); break;
     case 'clear-sample': guarded(clearSample); break;
-    case 'load-sample': guarded(async()=>{ if(!(await confirmBox('Load example data?','Adds 18 example products, 3 customers and two weeks of sales, all marked as examples so you can clear them later.','Load example data'))) return; await loadSampleInto(db); toast('Example data loaded.'); }); break;
+    case 'load-sample': guarded(async()=>{ if(!(await confirmBox('Load example data?','Adds 26 example products, 3 customers and two weeks of sales, all marked as examples so you can clear them later.','Load example data'))) return; await loadSampleInto(db); toast('Example data loaded.'); }); break;
     case 'sign-out': FB && FB.signOut(FB.auth).then(()=>location.reload()); break;
     case 'add-staff': guarded(async()=>{ const em = $('#staff-email').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Enter a valid Google email address.', true); return; } await db.doc('staff/'+em).set({role:'staff', name:$('#staff-name').value.trim(), added:Date.now(), addedBy:S.email}); $('#staff-email').value=''; $('#staff-name').value=''; toast(em+' can now sign in.'); }); break;
     case 'rm-staff': guarded(async()=>{ if(!(await confirmBox('Remove staff member?', esc(id)+' will lose access straight away.', 'Remove', true))) return; await db.doc('staff/'+id).delete(); toast('Access removed.'); }); break;
-    case 'copy-template': copyText('name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry\nSugar 1kg,6161100410013,Groceries,pkt,145,165,40,15,3,Mumias Dist.,no\n', 'Template copied. Paste into Excel and save as CSV.'); break;
+    case 'copy-template': copyText('name,sku,category,brand,variant,size,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry\nCaptain Morgan Spiced Gold 750ml,SP-001,Spirits,Captain Morgan,Spiced Gold,750ml,bottle,1450,1750,12,4,3,Spirits distributor,no\n', 'Template copied. Paste into Excel and save as CSV.'); break;
   }
 });
 document.addEventListener('input', e => {
@@ -1154,11 +1255,26 @@ function makeSample(now){
     ['Salt 1kg','DK-015','Groceries','pkt',28,35,25,6,5,'Mumias Distributors',false,1],
     ['Margarine 250g','DK-016','Groceries','tub',120,140,5,6,3,'Mumias Distributors',false,1.6],
     ['Petroleum jelly 250ml','DK-017','Personal care','jar',140,170,9,3,7,'Household Supplies Ltd',false,0],
-    ['Matchbox (10 pack)','DK-018','Household','pkt',25,30,12,4,7,'Household Supplies Ltd',false,0.4]
+    ['Matchbox (10 pack)','DK-018','Household','pkt',25,30,12,4,7,'Household Supplies Ltd',false,0.4],
+    ['Captain Morgan Spiced Gold 250ml','SP-001','Spirits','bottle',640,800,14,6,3,'Spirits distributor',false,1.6],
+    ['Captain Morgan Spiced Gold 750ml','SP-002','Spirits','bottle',1450,1750,8,4,3,'Spirits distributor',false,0.9],
+    ['Captain Morgan Spiced Gold 1L','SP-003','Spirits','bottle',1900,2300,3,3,3,'Spirits distributor',false,0.4],
+    ['Captain Morgan Original Rum 750ml','SP-004','Spirits','bottle',1350,1650,6,3,3,'Spirits distributor',false,0.4],
+    ['Kenya Cane Original 250ml','SP-005','Spirits','bottle',260,330,30,12,3,'Spirits distributor',false,3],
+    ['Kenya Cane Original 750ml','SP-006','Spirits','bottle',750,950,10,5,3,'Spirits distributor',false,1],
+    ['Kenya Cane Pineapple 250ml','SP-007','Spirits','bottle',270,340,4,10,3,'Spirits distributor',false,2],
+    ['Kenya Cane Pineapple 750ml','SP-008','Spirits','bottle',780,980,7,4,3,'Spirits distributor',false,0.6]
   ];
+  // brand / flavour / size for the grouped Products view
+  const BVS = {'DK-001':['Mumias','','1kg'],'DK-002':['Jogoo','','2kg'],'DK-003':['Fresh Fri','','1L'],'DK-004':['Pishori','','1kg'],
+    'DK-005':['Brookside','Whole','500ml'],'DK-006':['Supaloaf','White','400g'],'DK-007':['Daima','Strawberry','250ml'],'DK-009':['Kimbo','','500g'],
+    'DK-010':['Ketepa','','250g'],'DK-011':['Omo','','500g'],'DK-012':['Menengai','','800g'],'DK-013':['Rosy','Single ply','1 roll'],
+    'DK-014':['Coca-Cola','Original','500ml'],'DK-015':['Kensalt','','1kg'],'DK-016':['Blue Band','','250g'],
+    'SP-001':['Captain Morgan','Spiced Gold','250ml'],'SP-002':['Captain Morgan','Spiced Gold','750ml'],'SP-003':['Captain Morgan','Spiced Gold','1L'],'SP-004':['Captain Morgan','Original Rum','750ml'],
+    'SP-005':['Kenya Cane','Original','250ml'],'SP-006':['Kenya Cane','Original','750ml'],'SP-007':['Kenya Cane','Pineapple','250ml'],'SP-008':['Kenya Cane','Pineapple','750ml']};
   const day = t => { const d=new Date(t); d.setHours(0,0,0,0); return d.getTime(); };
   const t0 = day(now); const plus = n => ymd(t0+n*DAY);
-  const products = P.map(([name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry,rate],i)=>({id:'ex-p'+(i+1), name, sku, category, unit, cost, price, stock, reorder, leadDays, supplier, tracksExpiry, rate, created:now-60*DAY, archived:false, sample:true}));
+  const products = P.map(([name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry,rate],i)=>({id:'ex-p'+(i+1), name, sku, category, unit, cost, price, stock, reorder, leadDays, supplier, tracksExpiry, rate, brand:(BVS[sku]||[])[0]||'', variant:(BVS[sku]||[])[1]||'', size:(BVS[sku]||[])[2]||'', created:now-60*DAY, archived:false, sample:true}));
   const customers = [['ex-c1','Mama Wanjiku','0712 345 678',3000],['ex-c2','Otieno (boda)','0722 456 789',1500],['ex-c3','Shiro Salon','0733 567 890',5000]].map(([id,name,phone,limit])=>({id,name,phone,limit,balance:0,created:now-50*DAY,sample:true}));
   const sales = []; const lastSold = {};
   const weighted = products.filter(p=>p.rate>0);
