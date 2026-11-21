@@ -1379,9 +1379,36 @@ const AUTH_MSG = {
   'auth/web-storage-unsupported': () => 'This browser is blocking storage (private mode or strict settings). Use a normal Chrome or Safari window.',
   'auth/operation-not-allowed': () => 'This sign-in method is not switched on in Firebase. The owner needs to enable it under Authentication › Sign-in method.',
   'auth/invalid-action-code': () => 'That sign-in link has expired or was already used. Request a new one.',
-  'auth/too-many-requests': () => 'Too many attempts. Wait a few minutes and try again.'
+  'auth/too-many-requests': () => 'Too many attempts. Wait a few minutes and try again.',
+  'auth/invalid-credential': () => 'Google sign-in was refused by Firebase. Check that googleClientId in firebase-config.js is the Web client ID shown under Authentication › Sign-in method › Google › Web SDK configuration.'
 };
 const authMsg = e => (AUTH_MSG[e && e.code] ? AUTH_MSG[e.code]() : 'Sign-in failed ('+((e && e.code) || 'unknown')+'). Try the email link below.');
+/* Google Identity Services: signs in on accounts.google.com directly, then hands the token to Firebase.
+   This avoids the firebaseapp.com hand-off page that phone browsers block for github.io sites. */
+let gisReady = null;
+function loadGIS(){
+  if(!gisReady) gisReady = new Promise((res, rej) => {
+    if(window.google && google.accounts && google.accounts.id) return res();
+    const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => res(); sc.onerror = () => { gisReady = null; rej(new Error('gis-load')); }; document.head.appendChild(sc);
+    setTimeout(()=>rej(new Error('gis-timeout')), 12000);
+  });
+  return gisReady;
+}
+async function mountGIS(){
+  const cid0 = (window.FIREBASE_CONFIG||{}).googleClientId; const cid = cid0 && !/^0{6}/.test(cid0) ? cid0 : null; const box = $('#gsi-btn'); if(!cid || !box) return false;
+  try{ await loadGIS(); }catch(e){ console.warn(e); return false; }
+  if(!$('#gsi-btn')) return false;
+  google.accounts.id.initialize({ client_id: cid, ux_mode: 'popup', auto_select: false, use_fedcm_for_prompt: true, itp_support: true,
+    callback: async r => {
+      try{ await FB.signInWithCredential(FB.auth, FB.GoogleAuthProvider.credential(r.credential)); }
+      catch(e){ console.warn(e); showSignIn(authMsg(e)); }
+    } });
+  box.innerHTML = '';
+  google.accounts.id.renderButton(box, { type:'standard', theme:'outline', size:'large', text:'signin_with', shape:'rectangular', logo_alignment:'center', width: Math.min(400, Math.max(240, box.offsetWidth||300)) });
+  $('#g-in').classList.add('hide');
+  return true;
+}
 function showSignIn(msg, info){
   const here = location.href.split('#')[0].split('?')[0];
   const chromeIntent = 'intent://' + here.replace(/^https?:\/\//,'') + '#Intent;scheme=https;package=com.android.chrome;end';
@@ -1390,10 +1417,12 @@ function showSignIn(msg, info){
     ${IS_IOS_APP?`<div class="banner info" style="margin:0">If Google sign-in doesn't come back to the app, use the email link below, or sign in once in Safari first.</div>`:''}
     ${msg?`<div class="banner bad" style="margin:0">${esc(msg)}</div>`:''}
     ${info?`<div class="banner info" style="margin:0">${esc(info)}</div>`:''}
+    <div id="gsi-btn" style="display:flex;justify-content:center;min-height:${(window.FIREBASE_CONFIG||{}).googleClientId?'44px':'0'}"></div>
     <button class="gbtn" id="g-in">${GLOGO} Sign in with Google</button>
     <div class="row" style="gap:8px;align-items:center;color:var(--muted);font-size:13px"><span style="flex:1;height:1px;background:var(--line)"></span>or<span style="flex:1;height:1px;background:var(--line)"></span></div>
     <form id="el-form" class="grid" style="gap:8px"><label class="small muted" for="el-email">Get a one-time sign-in link by email (works on any phone)</label>
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="el-email" inputmode="email" autocomplete="email" placeholder="your@gmail.com"><button class="btn" type="submit">Send link</button></div></form>`);
+  mountGIS();
   const cl = $('#copy-link'); if(cl) cl.onclick = () => copyText(here, 'Link copied. Paste it into '+(IS_ANDROID?'Chrome':'Safari')+'.');
   $('#g-in').onclick = async () => {
     const prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({prompt:'select_account'});
