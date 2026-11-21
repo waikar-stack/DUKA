@@ -1,0 +1,9 @@
+{
+  "name": "Duka Stock Manager",
+  "short_name": "Duka",
+  "start_url": "./", "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4ef",
+  "theme_color": "#14231c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duka Stock Manager</title>
+<meta name="theme-color" content="#14231c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: fixed left rail of sections, working area on the right; rail becomes a scrolling top strip on phones. */
+:root{
+  --bg:#f3f4ef; --surface:#ffffff; --surface-2:#f8f9f5; --ink:#18211c; --muted:#5e6a62; --line:#dde2d9;
+  --accent:#0b6e4f; --accent-ink:#ffffff; --accent-soft:#e0f0e8;
+  --ok:#1d7a46; --ok-soft:#e3f3e8; --warn:#a15c00; --warn-soft:#fdf0d9; --bad:#b42318; --bad-soft:#fde7e4;
+  --rail:#14231c; --rail-ink:#cfdcd4; --rail-active:#f2b33d;
+  --display:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius:10px; --shadow:0 1px 2px rgba(20,35,28,.06), 0 4px 14px rgba(20,35,28,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --surface:#171f1b; --surface-2:#1c2520; --ink:#e7ede9; --muted:#9aa89f; --line:#2b3630;
+    --accent:#3fb98a; --accent-ink:#06150e; --accent-soft:#163428;
+    --ok:#5cc98a; --ok-soft:#173326; --warn:#f0b04a; --warn-soft:#3a2c12; --bad:#ff7b6e; --bad-soft:#3d1a17;
+    --rail:#0a100d; --rail-ink:#b9c8bf; --rail-active:#f2b33d;
+    --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --surface:#171f1b; --surface-2:#1c2520; --ink:#e7ede9; --muted:#9aa89f; --line:#2b3630;
+  --accent:#3fb98a; --accent-ink:#06150e; --accent-soft:#163428;
+  --ok:#5cc98a; --ok-soft:#173326; --warn:#f0b04a; --warn-soft:#3a2c12; --bad:#ff7b6e; --bad-soft:#3d1a17;
+  --rail:#0a100d; --rail-ink:#b9c8bf; --rail-active:#f2b33d;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:24px;font-weight:800} h2{font-size:17px;font-weight:700} h3{font-size:14px;font-weight:700}
+.num,td.n,th.n{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:220px 1fr;height:100%}
+.rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;padding:18px 12px;gap:4px;overflow:auto}
+.brand{padding:4px 10px 16px;display:flex;flex-direction:column;gap:2px}
+.brand b{font-family:var(--display);font-size:19px;color:#fff;font-weight:800;letter-spacing:-.02em}
+.brand span{font-size:12px;opacity:.7}
+.rail a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:inherit;text-decoration:none;font-weight:500;font-size:14px}
+.rail a:hover{background:rgba(255,255,255,.06)}
+.rail a.on{background:rgba(242,179,61,.14);color:#fff}
+.rail a.on svg{color:var(--rail-active)}
+.rail svg{width:18px;height:18px;flex:none;opacity:.9}
+.rail .badge{margin-left:auto;background:var(--rail-active);color:#1b1300;font-size:11px;font-weight:700;border-radius:20px;padding:1px 7px}
+.rail .foot{margin-top:auto;padding:12px 10px 0;font-size:12px;opacity:.75;display:flex;flex-direction:column;gap:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#888;margin-right:6px;vertical-align:middle}
+.dot.live{background:#3fd08a}.dot.wait{background:#f2b33d}.dot.off{background:#ff7b6e}
+main{overflow:auto;padding:22px clamp(16px,3vw,32px) 60px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:4px;text-decoration:none;color:inherit}
+a.tile:hover{border-color:var(--accent)}
+.tile .k{font-size:12.5px;color:var(--muted);font-weight:500}
+.tile .v{font-family:var(--display);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.tile .s{font-size:12.5px;color:var(--muted)}
+.tile.warn{border-left:4px solid var(--warn)} .tile.bad{border-left:4px solid var(--bad)} .tile.ok{border-left:4px solid var(--ok)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;min-width:0}
+.card>.ch{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.card .sub{color:var(--muted);font-size:13px}
+.tw{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right}
+td .meta{display:block;font-size:12px;color:var(--muted)}
+tbody tr:hover{background:var(--surface-2)}
+.empty{color:var(--muted);font-size:14px;padding:18px 4px;text-align:center}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.mute{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 13px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:var(--bad-soft)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn.big{padding:13px 18px;font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn svg{width:16px;height:16px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12.5px;font-weight:600;color:var(--muted)}
+input[type=text],input[type=number],input[type=date],input[type=search],input[type=tel],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+input.qty{width:80px;text-align:right}
+input.cell{width:100px;text-align:right;padding:6px 8px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:9px 14px;font-weight:600;cursor:pointer;font-size:14px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.banner{border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner.warn{background:var(--warn-soft);color:var(--warn)} .banner.info{background:var(--accent-soft);color:var(--accent)} .banner.bad{background:var(--bad-soft);color:var(--bad)}
+.list{display:flex;flex-direction:column}
+.li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.li:last-child{border-bottom:0}
+.li .l{min-width:0}.li .l b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis}
+.li .l span{font-size:12.5px;color:var(--muted)}
+.li .r{text-align:right;flex:none;font-variant-numeric:tabular-nums}
+/* POS */
+.pos{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);gap:16px;align-items:start}
+.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.qbtn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:70px}
+.qbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.qbtn b{font-size:13.5px;font-weight:600;line-height:1.25}
+.qbtn span{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.qbtn.out{opacity:.55}
+.basket{position:sticky;top:0}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-top:2px solid var(--ink);margin-top:6px}
+.total b{font-family:var(--display);font-size:28px;font-variant-numeric:tabular-nums}
+.sugg{position:relative}
+.sugg-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);z-index:20;max-height:300px;overflow:auto}
+.sugg-list button{display:flex;justify-content:space-between;width:100%;border:0;background:transparent;padding:9px 12px;cursor:pointer;text-align:left;gap:10px}
+.sugg-list button:hover,.sugg-list button.hl{background:var(--accent-soft)}
+.sugg-list span{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+/* chart */
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:12px;font-family:var(--body)}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,18,14,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto}
+.modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(560px,100%);padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal.wide{width:min(820px,100%)}
+.modal .mf{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:9px;font-weight:500;font-size:14px;z-index:60;box-shadow:var(--shadow);max-width:90vw}
+.toast.bad{background:var(--bad);color:#fff}
+.receipt{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px dashed var(--line);border-radius:8px;padding:14px;white-space:pre-wrap}
+.muted{color:var(--muted)} .small{font-size:13px}
+.right{margin-left:auto}
+.hide{display:none!important}
+.mono{font-family:var(--mono)}
+.gate{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--rail)}
+.gate .box{background:var(--surface);border-radius:16px;padding:32px;width:min(440px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.gate h1{font-size:26px}
+.gate p{margin:0;color:var(--muted)}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px;font-weight:600;font-size:15px;cursor:pointer}
+.gbtn:hover{border-color:var(--accent)}
+.who{display:flex;flex-direction:column;gap:2px;word-break:break-all}
+.who button{background:none;border:0;color:var(--rail-active);padding:0;text-align:left;cursor:pointer;font-size:12px;font-weight:600}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .rail{flex-direction:row;padding:8px;gap:2px;overflow-x:auto;overflow-y:hidden}
+  .brand,.rail .foot{display:none}
+  .rail a{flex:none;padding:8px 10px;font-size:13px}
+  .pos{grid-template-columns:1fr}
+  .basket{position:static}
+  main{padding-top:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Sections"></nav>
+  <main id="main"><p class="muted">Loading your shop…</p></main>
+</div>
+<div id="modal-root"></div>
+<script src="firebase-config.js"></script>
+<script>
+/* ---------------- utilities ---------------- */
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DAY = 86400000;
+const pad = n => String(n).padStart(2,'0');
+const ymd = t => { const d = new Date(t); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+const today = () => ymd(Date.now());
+const startOfDay = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d).getTime(); };
+const daysBetween = (a,b) => Math.round((startOfDay(b)-startOfDay(a))/DAY);
+const kes = n => 'KES ' + Math.round(Number(n)||0).toLocaleString('en-KE');
+const kes2 = n => (Number(n)||0).toLocaleString('en-KE',{minimumFractionDigits:0,maximumFractionDigits:2});
+const qtyf = n => { n = Number(n)||0; return Number.isInteger(n) ? n.toLocaleString('en-KE') : n.toLocaleString('en-KE',{maximumFractionDigits:2}); };
+const fmtDate = t => new Date(t).toLocaleDateString('en-KE',{day:'numeric',month:'short'});
+const fmtDT = t => new Date(t).toLocaleString('en-KE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+const fmtD = s => s ? new Date(startOfDay(s)).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'}) : '';
+const num = v => { const n = parseFloat(String(v).replace(/,/g,'')); return isFinite(n) ? n : 0; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const sum = (a,f) => a.reduce((s,x)=>s+(f?f(x):x),0);
+
+const ICON = {
+  dashboard:'<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
+  sell:'<path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M6 6 5 3H2"/>',
+  products:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  'stock-in':'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
+  expiry:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
+  credit:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  'stock-take':'<path d="M9 4h6v3H9z"/><path d="M8 5H5v16h14V5h-3"/><path d="m9 13 2 2 4-4"/>',
+  reports:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  'shop-settings':'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', down:'<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>'
+};
+const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]||''}</svg>`;
+
+const VIEWS = [
+  ['dashboard','Dashboard'],['sell','Quick sale'],['products','Products'],['stock-in','Stock in'],
+  ['expiry','Expiry'],['credit','Credit customers'],['stock-take','Stock take'],['reports','Reports'],
+  ['history','History'],['shop-settings','Settings']
+];
+const REASONS = {damage:'Damaged',expired:'Expired',theft:'Theft / missing',own:'Own use',found:'Found / extra',count:'Stock take',other:'Other'};
+const METHODS = {cash:'Cash',mpesa:'M-Pesa',credit:'Credit'};
+
+/* ---------------- in-memory store (used only if the live store is unavailable) ---------------- */
+function MemDB(){
+  const store = new Map(); const subs = new Set();
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const notify = () => setTimeout(()=>subs.forEach(f=>f()),0);
+  const snap = p => { const d = store.get(p); const c = d ? clone(d) : undefined; return {id:p.split('/').pop(), exists:!!d, data:()=>c, metadata:{fromCache:false,hasPendingWrites:false}}; };
+  const docRef = p => ({ id:p.split('/').pop(), path:p,
+    get: async()=>snap(p),
+    set: async d=>{ store.set(p, clone(d)); notify(); },
+    update: async d=>{ if(!store.has(p)) throw {code:'invalid_argument',message:'missing'}; store.set(p, {...store.get(p), ...clone(d)}); notify(); },
+    delete: async()=>{ store.delete(p); notify(); },
+    onSnapshot(next){ const f=()=>next(snap(p)); subs.add(f); setTimeout(f,0); return ()=>subs.delete(f); },
+    collection: c => coll(p+'/'+c) });
+  const cmp = (x,op,v) => op==='>'?x>v:op==='>='?x>=v:op==='<'?x<v:op==='<='?x<=v:op==='=='?x===v:op==='!='?x!==v:true;
+  const query = (cp, fl=[], ord=null, lim=null) => {
+    const run = () => {
+      let docs = [...store.keys()].filter(k=>k.split('/').slice(0,-1).join('/')===cp).map(snap);
+      fl.forEach(([f,op,v])=>{ docs = docs.filter(d=>cmp(d.data()[f],op,v)); });
+      if(ord) docs.sort((a,b)=>{ const x=a.data()[ord[0]], y=b.data()[ord[0]]; return (x>y?1:x<y?-1:0)*(ord[1]==='desc'?-1:1); });
+      if(lim) docs = docs.slice(0,lim);
+      return {docs, size:docs.length, empty:!docs.length, docChanges:()=>[], metadata:{fromCache:false,hasPendingWrites:false}};
+    };
+    return { where:(f,op,v)=>query(cp,[...fl,[f,op,v]],ord,lim), orderBy:(f,d)=>query(cp,fl,[f,d||'asc'],lim), limit:n=>query(cp,fl,ord,n),
+      get: async()=>run(), onSnapshot(next){ const f=()=>next(run()); subs.add(f); setTimeout(f,0); return ()=>subs.delete(f); } };
+  };
+  const coll = p => Object.assign(query(p), { path:p, doc:id=>docRef(p+'/'+(id||uid())), add: async d=>{ const r=docRef(p+'/'+uid()); await r.set(d); return r; } });
+  return { doc:docRef, collection:coll };
+}
+
+/* ---------------- state ---------------- */
+const DEFAULT_SETTINGS = { shopName:'My Duka', expiryWarnDays:30, deadDays:14, coverDays:7, archiveDays:180 };
+const S = {
+  products:{}, batches:{}, sales:[], receipts:[], adjustments:[], customers:{}, payments:[], stocktakes:[], summaries:{},
+  settings:{...DEFAULT_SETTINGS}, staff:{}, role:null, email:null, pending:false, loadedProducts:false, loaded:new Set(), status:'wait', mode:'live', canWrite:true, me:null
+};
+let db = null;
+const UI = {
+  view:'dashboard',
+  prodSearch:'', prodCat:'', prodStatus:'',
+  basket:[], saleSearch:'', payMethod:'cash', saleCust:'', saleRef:'', tendered:'', lastSale:null,
+  stockIn:{supplier:'', invoice:'', date:today(), lines:[]}, siSearch:'',
+  count:{}, countCat:'', countSearch:'',
+  rep:{from:ymd(Date.now()-6*DAY), to:today(), data:null, loading:false},
+  histType:'', custSearch:''
+};
+
+/* ---------------- derived data ---------------- */
+function activeProducts(){ return Object.values(S.products).filter(p=>!p.archived).sort((a,b)=>a.name.localeCompare(b.name)); }
+function salesStats(){
+  // quantity sold per product over the last 30 days (from loaded sales)
+  const since = Date.now()-30*DAY; const per = {}; let first = Date.now();
+  S.sales.forEach(s=>{ if(s.ts>=since){ first = Math.min(first, s.ts); (s.items||[]).forEach(i=>{ per[i.pid]=(per[i.pid]||0)+num(i.qty); }); } });
+  // average over 30 days, or over the days since the first recorded sale for a new shop (at least 7)
+  per._days = Math.min(30, Math.max(7, Math.ceil((Date.now()-first)/DAY)));
+  return per;
+}
+function analyse(){
+  const per = salesStats(); const set = S.settings; const t = Date.now();
+  return activeProducts().map(p=>{
+    const sold30 = per[p.id]||0; const avg = sold30/per._days; const stock = num(p.stock);
+    const cover = avg>0 ? stock/avg : Infinity;
+    const lead = num(p.leadDays)||2; const reorder = num(p.reorder);
+    let status = 'ok';
+    if(stock<=0) status='out'; else if(stock<=reorder || cover<=lead) status='low';
+    const target = avg>0 ? Math.ceil(avg*(lead+num(set.coverDays))) : reorder*2;
+    const suggest = Math.max(0, Math.max(target, reorder+1) - stock);
+    const idle = p.lastSold ? Math.floor((t-p.lastSold)/DAY) : null;
+    const dead = stock>0 && (idle===null ? (p.created && (t-p.created)/DAY>num(set.deadDays)) : idle>=num(set.deadDays));
+    return {...p, sold30, avg, cover, status, suggest, idle, dead, value:stock*num(p.cost)};
+  });
+}
+function batchList(){
+  const warn = num(S.settings.expiryWarnDays); const td = today();
+  return Object.values(S.batches).filter(b=>num(b.qty)>0 && S.products[b.pid] && !S.products[b.pid].archived).map(b=>{
+    const d = daysBetween(td, b.expiry); const p = S.products[b.pid];
+    const st = d<0?'expired':d<=7?'week':d<=warn?'soon':'ok';
+    return {...b, days:d, st, name:p.name, unit:p.unit, value:num(b.qty)*num(p.cost)};
+  }).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+}
+function statusPill(s){
+  return s==='out'?'<span class="pill bad">Out</span>':s==='low'?'<span class="pill warn">Low</span>':'<span class="pill ok">OK</span>';
+}
+function expiryPill(b){
+  if(b.st==='expired') return `<span class="pill bad">Expired ${-b.days}d ago</span>`;
+  if(b.days===0) return '<span class="pill bad">Expires today</span>';
+  if(b.st==='week') return `<span class="pill bad">${b.days}d left</span>`;
+  if(b.st==='soon') return `<span class="pill warn">${b.days}d left</span>`;
+  return `<span class="pill ok">${b.days}d left</span>`;
+}
+function owedTotal(){ return sum(Object.values(S.customers), c=>Math.max(0,num(c.balance))); }
+
+/* ---------------- rendering ---------------- */
+let renderQueued = false;
+function schedule(){ if(renderQueued) return; renderQueued = true; requestAnimationFrame(()=>{ renderQueued=false; render(); }); }
+function render(){
+  renderRail();
+  const main = $('#main');
+  // preserve focus and typed values across re-renders
+  const ae = document.activeElement; const focusId = ae && main.contains(ae) ? ae.id : null;
+  let selS=null, selE=null; try{ if(focusId){ selS=ae.selectionStart; selE=ae.selectionEnd; } }catch(e){}
+  const vals = {}; main.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{ if(el.type!=='file' && !el.dataset.live) vals[el.id] = el.type==='checkbox'?el.checked:el.value; });
+  const scroll = main.scrollTop;
+  const fn = RENDER[UI.view] || RENDER.dashboard;
+  main.innerHTML = banners() + fn();
+  Object.entries(vals).forEach(([id,v])=>{ const el = document.getElementById(id); if(el && main.contains(el) && !el.dataset.live){ if(el.type==='checkbox') el.checked=v; else el.value=v; } });
+  if(focusId){ const el = document.getElementById(focusId); if(el){ el.focus(); try{ if(selS!=null) el.setSelectionRange(selS,selE); }catch(e){} } }
+  main.scrollTop = scroll;
+  if(AFTER[UI.view]) AFTER[UI.view]();
+}
+function banners(){
+  let h = '';
+  if(S.mode==='memory') h += `<div class="banner warn"><b>Demo mode.</b> Nothing is saved; changes last only until you close the page.</div>`;
+  if(S.status==='off' && S.mode==='live') h += `<div class="banner warn"><b>You're offline.</b> Keep selling: changes are saved on this device and sync automatically when the internet is back.${S.pending?' Some changes are waiting to sync.':''}</div>`;
+  if(!S.canWrite) h += `<div class="banner info">You have view-only access. Ask the owner for Contributor access to record sales and stock.</div>`;
+  const sample = Object.values(S.products).some(p=>p.sample);
+  if(UI.view==='dashboard' && S.mode==='live' && S.loadedProducts && !Object.keys(S.products).length) h += `<div class="banner info"><span><b>Welcome!</b> Your shop is empty. Add your products (or import a CSV list), or load example data to explore first.</span><span class="row right"><a class="btn sm" href="#products">Add products</a>${S.role==='owner'?'<button class="btn sm" data-act="load-sample">Load example data</button>':''}</span></div>`;
+  if(sample && UI.view==='dashboard') h += `<div class="banner info"><span><b>Example data loaded</b> so you can see how everything works. Clear it when you're ready to add your own stock.</span><button class="btn sm right" data-act="clear-sample">Clear example data</button></div>`;
+  return h;
+}
+function renderRail(){
+  const an = analyse(); const low = an.filter(p=>p.status!=='ok').length;
+  const exp = batchList().filter(b=>b.st!=='ok').length;
+  const badges = {dashboard:0, products:low, expiry:exp};
+  $('#rail').innerHTML = `<div class="brand"><b>${esc(S.settings.shopName||'My Duka')}</b><span>Stock manager</span></div>` +
+    VIEWS.map(([k,l])=>`<a href="#${k}" class="${UI.view===k?'on':''}" ${UI.view===k?'aria-current="page"':''}>${icon(k)}<span>${l}</span>${badges[k]?`<span class="badge">${badges[k]}</span>`:''}</a>`).join('') +
+    `<div class="foot">${S.email?`<div class="who"><span>${esc(S.email)}${S.role==='owner'?' · owner':''}</span><button data-act="sign-out">Sign out</button></div>`:''}<span><i class="dot ${S.status==='live'&&S.pending?'wait':S.status}"></i>${S.mode==='memory'?'Demo mode':S.status==='live'?(S.pending?'Syncing…':'Saved & synced'):S.status==='wait'?'Connecting…':'Offline, saving on device'}</span><span>${new Date().toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</span></div>`;
+}
+const head = (t,p,actions='') => `<div class="head"><div><h1>${t}</h1>${p?`<p>${p}</p>`:''}</div><div class="row">${actions}</div></div>`;
+const dis = () => S.canWrite ? '' : 'disabled';
+
+/* ---------- Dashboard ---------- */
+function barChart(days){
+  const W=960, H=210, padL=44, padB=26, padT=12;
+  const max = Math.max(1, ...days.map(d=>d.v));
+  const step = niceStep(max/4); const top = Math.ceil(max/step)*step;
+  const bw = (W-padL-8)/days.length;
+  const y = v => padT + (H-padT-padB)*(1-v/top);
+  let g = '';
+  for(let v=0; v<=top+1e-9; v+=step){ g += `<line x1="${padL}" x2="${W-4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL-6}" y="${y(v)+4}" text-anchor="end">${v>=1000?(v/1000)+'k':v}</text>`; }
+  const bars = days.map((d,i)=>{ const x = padL + i*bw + bw*0.18, w = bw*0.64, yy = y(d.v), last = i===days.length-1;
+    return `<rect x="${x}" y="${yy}" width="${w}" height="${Math.max(0,H-padB-yy)}" rx="3" fill="var(--accent)" opacity="${last?1:.55}"><title>${d.label}: ${kes(d.v)}</title></rect>` +
+      `<text x="${x+w/2}" y="${H-7}" text-anchor="middle" ${last?'style="fill:var(--ink);font-weight:600"':''}>${d.short}</text>`;
+  }).join('');
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily sales, last ${days.length} days">${g}${bars}</svg></div>`;
+}
+function niceStep(x){ if(x<=0) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const m = x/p; return (m<=1?1:m<=2?2:m<=5?5:10)*p; }
+const RENDER = {};
+const AFTER = {};
+RENDER.dashboard = () => {
+  const td = today(); const todays = S.sales.filter(s=>s.date===td);
+  const rev = sum(todays,s=>num(s.total)), gp = rev - sum(todays,s=>num(s.costTotal));
+  const an = analyse(); const value = sum(an,p=>Math.max(0,p.value));
+  const low = an.filter(p=>p.status!=='ok').sort((a,b)=>(a.status==='out'?0:1)-(b.status==='out'?0:1) || a.cover-b.cover);
+  const bl = batchList(); const expSoon = bl.filter(b=>b.st!=='ok');
+  const owed = owedTotal(); const debtors = Object.values(S.customers).filter(c=>num(c.balance)>0).length;
+  const days = []; for(let i=13;i>=0;i--){ const d = ymd(Date.now()-i*DAY); const v = sum(S.sales.filter(s=>s.date===d), s=>num(s.total)); const dt = new Date(startOfDay(d)); days.push({v, label:fmtD(d), short: i===0?'Today':String(dt.getDate())}); }
+  const wk = sum(days.slice(7),d=>d.v), pwk = sum(days.slice(0,7),d=>d.v);
+  const top = [...an].filter(p=>p.sold30>0).sort((a,b)=>b.sold30-a.sold30).slice(0,8);
+  const dead = an.filter(p=>p.dead).sort((a,b)=>b.value-a.value).slice(0,6);
+  const byMethod = {cash:0,mpesa:0,credit:0}; todays.forEach(s=>byMethod[s.method]=(byMethod[s.method]||0)+num(s.total));
+  const change = pwk>0 ? Math.round((wk-pwk)/pwk*100) : null;
+  return head('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'), `Here's how ${esc(S.settings.shopName)} is doing today.`,
+      `<a class="btn pri big" href="#sell">${icon('sell')} New sale</a><a class="btn big" href="#stock-in">${icon('stock-in')} Receive stock</a>`) +
+  `<div class="tiles">
+    <div class="tile ok"><span class="k">Sales today</span><span class="v">${kes(rev)}</span><span class="s">${todays.length} sale${todays.length===1?'':'s'} · Cash ${kes(byMethod.cash)} · M-Pesa ${kes(byMethod.mpesa)}</span></div>
+    <div class="tile"><span class="k">Gross profit today</span><span class="v">${kes(gp)}</span><span class="s">${rev?Math.round(gp/rev*100)+'% margin':'No sales yet'}</span></div>
+    <div class="tile"><span class="k">Stock value (at cost)</span><span class="v">${kes(value)}</span><span class="s">${an.length} active products</span></div>
+    <a class="tile ${low.length?'warn':''}" href="#products" data-act="filter-low"><span class="k">Low or out of stock</span><span class="v">${low.length}</span><span class="s">${an.filter(p=>p.status==='out').length} out of stock</span></a>
+    <a class="tile ${expSoon.some(b=>b.st==='expired'||b.st==='week')?'bad':expSoon.length?'warn':''}" href="#expiry"><span class="k">Expiring within ${S.settings.expiryWarnDays} days</span><span class="v">${expSoon.length}</span><span class="s">${kes(sum(expSoon,b=>b.value))} at risk</span></a>
+    <a class="tile ${owed?'warn':''}" href="#credit"><span class="k">Owed by customers</span><span class="v">${kes(owed)}</span><span class="s">${debtors} customer${debtors===1?'':'s'} with a balance</span></a>
+  </div>
+  <div class="grid g2">
+    <div class="card" style="grid-column:1/-1"><div class="ch"><div><h2>Sales, last 14 days</h2><span class="sub">This week ${kes(wk)}${change===null?'':` · ${change>=0?'up':'down'} ${Math.abs(change)}% on last week`}</span></div></div>${barChart(days)}</div>
+    <div class="card"><div class="ch"><div><h2>Reorder now</h2><span class="sub">Below reorder level or will run out before the next delivery</span></div><a class="btn sm" href="#stock-in">Receive stock</a></div>
+      ${low.length?`<div class="tw"><table><thead><tr><th>Product</th><th class="n">In stock</th><th class="n">Days left</th><th class="n">Order</th></tr></thead><tbody>${low.slice(0,8).map(p=>`<tr><td>${esc(p.name)} ${statusPill(p.status)}<span class="meta">${esc(p.supplier||'No supplier set')}</span></td><td class="n">${qtyf(p.stock)} ${esc(p.unit||'')}</td><td class="n">${p.cover===Infinity?'–':p.cover<1?'<1':Math.floor(p.cover)}</td><td class="n"><b>${qtyf(p.suggest)}</b></td></tr>`).join('')}</tbody></table></div>${low.length>8?`<p class="small muted">+${low.length-8} more on the Products page.</p>`:''}`:'<p class="empty">Everything is above its reorder level.</p>'}
+    </div>
+    <div class="card"><div class="ch"><div><h2>Fast movers</h2><span class="sub">Most units sold, last 30 days</span></div></div>
+      ${top.length?`<div class="list">${top.map((p,i)=>`<div class="li"><div class="l"><b>${i+1}. ${esc(p.name)}</b><span>${p.avg.toFixed(1)} ${esc(p.unit||'')}/day · ${qtyf(p.stock)} in stock</span></div><div class="r">${qtyf(p.sold30)} sold</div></div>`).join('')}</div>`:'<p class="empty">No sales in the last 30 days yet.</p>'}
+    </div>
+    <div class="card"><div class="ch"><div><h2>Expiring soon</h2><span class="sub">Sell these first or write them off</span></div><a class="btn sm" href="#expiry">See all</a></div>
+      ${expSoon.length?`<div class="list">${expSoon.slice(0,6).map(b=>`<div class="li"><div class="l"><b>${esc(b.name)}</b><span>${qtyf(b.qty)} ${esc(b.unit||'')} · expires ${fmtD(b.expiry)}</span></div><div class="r">${expiryPill(b)}</div></div>`).join('')}</div>`:'<p class="empty">Nothing expiring in the next '+S.settings.expiryWarnDays+' days.</p>'}
+    </div>
+    <div class="card"><div class="ch"><div><h2>Slow or dead stock</h2><span class="sub">Not sold in ${S.settings.deadDays}+ days, money tied up</span></div></div>
+      ${dead.length?`<div class="list">${dead.map(p=>`<div class="li"><div class="l"><b>${esc(p.name)}</b><span>${p.idle===null?'Never sold':'Last sold '+p.idle+' days ago'} · ${qtyf(p.stock)} ${esc(p.unit||'')}</span></div><div class="r">${kes(p.value)}</div></div>`).join('')}</div>`:'<p class="empty">No slow movers. Nice.</p>'}
+    </div>
+    <div class="card"><div class="ch"><div><h2>Latest sales</h2></div><a class="btn sm" href="#history">History</a></div>
+      ${S.sales.length?`<div class="list">${S.sales.slice(0,6).map(s=>`<div class="li"><div class="l"><b>${(s.items||[]).map(i=>esc(i.name)).slice(0,2).join(', ')}${(s.items||[]).length>2?' +'+((s.items.length)-2):''}</b><span>${fmtDT(s.ts)} · ${METHODS[s.method]||s.method}${s.cname?' · '+esc(s.cname):''}</span></div><div class="r">${kes(s.total)}</div></div>`).join('')}</div>`:'<p class="empty">No sales recorded yet.</p>'}
+    </div>
+  </div>`;
+};
+
+/* ---------- Quick sale ---------- */
+function findProducts(q, limit=8){
+  q = q.trim().toLowerCase(); if(!q) return [];
+  const all = activeProducts();
+  const exact = all.filter(p=>(p.sku||'').toLowerCase()===q);
+  if(exact.length) return exact;
+  return all.filter(p=>p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q)).slice(0,limit);
+}
+function basketTotal(){ return sum(UI.basket, l=>num(l.qty)*num(l.price)); }
+RENDER.sell = () => {
+  if(UI.lastSale) return saleDone();
+  const an = analyse(); const quick = [...an].sort((a,b)=>b.sold30-a.sold30 || a.name.localeCompare(b.name)).slice(0,18);
+  const matches = findProducts(UI.saleSearch);
+  const total = basketTotal();
+  const custs = Object.values(S.customers).sort((a,b)=>a.name.localeCompare(b.name));
+  const cust = S.customers[UI.saleCust];
+  const change = num(UI.tendered) - total;
+  return head('Quick sale','Search or scan an item, set the quantity, choose how they paid.') +
+  `<div class="pos">
+    <div class="grid">
+      <div class="card">
+        <div class="sugg">
+          <input type="search" id="sale-search" placeholder="Type a product name or scan a barcode, then press Enter" value="${esc(UI.saleSearch)}" autocomplete="off" aria-label="Find product">
+          ${matches.length?`<div class="sugg-list" role="listbox">${matches.map((p,i)=>`<button type="button" class="${i===0?'hl':''}" data-act="add-item" data-id="${p.id}"><b>${esc(p.name)}</b><span>${kes(p.price)} · ${qtyf(p.stock)} left</span></button>`).join('')}</div>`:(UI.saleSearch.trim()?`<div class="sugg-list"><p class="empty">No product matches “${esc(UI.saleSearch)}”.</p></div>`:'')}
+        </div>
+      </div>
+      <div class="card"><div class="ch"><h2>Tap to add</h2><span class="sub">Your best sellers</span></div>
+        ${quick.length?`<div class="quick">${quick.map(p=>`<button type="button" class="qbtn ${num(p.stock)<=0?'out':''}" data-act="add-item" data-id="${p.id}"><b>${esc(p.name)}</b><span>${kes(p.price)}</span><span>${num(p.stock)<=0?'Out of stock':qtyf(p.stock)+' left'}</span></button>`).join('')}</div>`:'<p class="empty">Add products first on the Products page.</p>'}
+      </div>
+    </div>
+    <div class="card basket">
+      <div class="ch"><h2>Basket</h2>${UI.basket.length?'<button class="btn sm" data-act="clear-basket">Clear</button>':''}</div>
+      ${UI.basket.length?`<div class="tw"><table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Amount</th><th></th></tr></thead><tbody>
+        ${UI.basket.map((l,i)=>{ const p=S.products[l.pid]; const short = p && num(l.qty)>num(p.stock);
+          return `<tr><td>${esc(l.name)}<span class="meta">@ ${kes2(l.price)}${short?` · <span style="color:var(--warn)">only ${qtyf(p.stock)} in stock</span>`:''}</span></td>
+          <td class="n"><input class="qty" type="number" min="0" step="any" inputmode="decimal" id="bq-${i}" data-live="1" data-bq="${i}" value="${l.qty}" aria-label="Quantity of ${esc(l.name)}"></td>
+          <td class="n">${kes2(num(l.qty)*num(l.price))}</td><td><button class="btn sm" data-act="rm-item" data-i="${i}" aria-label="Remove ${esc(l.name)}">${icon('x')}</button></td></tr>`; }).join('')}
+      </tbody></table></div>`:'<p class="empty">Basket is empty. Add items on the left.</p>'}
+      <div class="total"><span>Total</span><b id="sale-total">${kes(total)}</b></div>
+      <div class="grid" style="gap:12px">
+        <div class="seg" role="group" aria-label="Payment method">${Object.entries(METHODS).map(([k,l])=>`<button type="button" class="${UI.payMethod===k?'on':''}" data-act="pay" data-m="${k}">${l}</button>`).join('')}</div>
+        ${UI.payMethod==='cash'?`<div class="field"><label for="tendered">Cash received (optional)</label><input type="number" id="tendered" inputmode="decimal" value="${esc(UI.tendered)}" placeholder="e.g. 1000"><span class="small ${change<0?'':'muted'}" id="change-line">${UI.tendered?(change>=0?'Change: <b>'+kes(change)+'</b>':'Short by '+kes(-change)):''}</span></div>`:''}
+        ${UI.payMethod==='mpesa'?`<div class="field"><label for="sale-ref">M-Pesa code (optional)</label><input type="text" id="sale-ref" value="${esc(UI.saleRef)}" placeholder="e.g. SKL4X2M9QP" style="text-transform:uppercase"></div>`:''}
+        ${UI.payMethod==='credit'?`<div class="field"><label for="sale-cust">Customer</label><div class="row" style="flex-wrap:nowrap"><select id="sale-cust"><option value="">Choose customer…</option>${custs.map(c=>`<option value="${c.id}" ${UI.saleCust===c.id?'selected':''}>${esc(c.name)} (owes ${kes(c.balance)})</option>`).join('')}</select><button class="btn" data-act="new-cust" ${dis()}>${icon('plus')} New</button></div>
+          ${cust && num(cust.limit)>0 && num(cust.balance)+total>num(cust.limit)?`<span class="small" style="color:var(--warn)">This sale takes ${esc(cust.name)} over their credit limit of ${kes(cust.limit)}.</span>`:''}</div>`:''}
+        <button class="btn pri big" data-act="complete-sale" ${UI.basket.length&&S.canWrite?'':'disabled'}>Complete sale · ${kes(total)}</button>
+      </div>
+    </div>
+  </div>`;
+};
+function saleDone(){
+  const s = UI.lastSale;
+  const lines = s.items.map(i=>`${i.name}\n  ${qtyf(i.qty)} x ${kes2(i.price)}`.padEnd(30)+`  ${kes2(i.qty*i.price)}`).join('\n');
+  const rcpt = `${S.settings.shopName}\n${fmtDT(s.ts)}\n${'-'.repeat(32)}\n${lines}\n${'-'.repeat(32)}\nTOTAL            ${kes(s.total)}\nPaid by ${METHODS[s.method]}${s.ref?' ('+s.ref+')':''}${s.cname?'\nCustomer: '+s.cname:''}${s.method==='cash'&&s.tendered?`\nCash ${kes(s.tendered)}  Change ${kes(s.tendered-s.total)}`:''}\n\nAsante kwa kununua!`;
+  return head('Sale complete', `${kes(s.total)} paid by ${METHODS[s.method]}. Stock has been updated.`) +
+  `<div class="grid g2"><div class="card"><div class="ch"><h2>Receipt</h2><button class="btn sm" data-act="copy-receipt">Copy receipt text</button></div><div class="receipt" id="receipt-text">${esc(rcpt)}</div></div>
+   <div class="card"><h2>Next</h2><p class="muted">Start the next customer's sale, or check what's low.</p><div class="row"><button class="btn pri big" data-act="new-sale">New sale</button><a class="btn big" href="#dashboard">Dashboard</a></div></div></div>`;
+}
+AFTER.sell = () => {
+  const s = $('#sale-search'); if(s && !UI.lastSale && document.activeElement===document.body) s.focus();
+};
+
+/* ---------- Products ---------- */
+RENDER.products = () => {
+  const an = analyse(); const cats = [...new Set(an.map(p=>p.category).filter(Boolean))].sort();
+  const q = UI.prodSearch.toLowerCase();
+  const rows = an.filter(p=>(!q || p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.supplier||'').toLowerCase().includes(q)) && (!UI.prodCat || p.category===UI.prodCat) && (!UI.prodStatus || (UI.prodStatus==='attention'?p.status!=='ok':UI.prodStatus==='dead'?p.dead:p.status===UI.prodStatus)));
+  const archived = Object.values(S.products).filter(p=>p.archived).length;
+  return head('Products', `${an.length} products · stock value ${kes(sum(an,p=>Math.max(0,p.value)))} at cost`,
+    `<button class="btn" data-act="import-csv" ${dis()}>Import CSV</button><button class="btn" data-act="export-products">${icon('down')} Export</button><button class="btn pri" data-act="edit-product" ${dis()}>${icon('plus')} Add product</button>`) +
+  `<div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <input type="search" id="prod-search" placeholder="Search name, barcode or supplier" value="${esc(UI.prodSearch)}" style="max-width:300px" aria-label="Search products">
+      <select id="prod-cat" style="max-width:190px" aria-label="Category"><option value="">All categories</option>${cats.map(c=>`<option ${UI.prodCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <select id="prod-status" style="max-width:190px" aria-label="Status"><option value="">Any status</option><option value="attention" ${UI.prodStatus==='attention'?'selected':''}>Needs reorder</option><option value="out" ${UI.prodStatus==='out'?'selected':''}>Out of stock</option><option value="dead" ${UI.prodStatus==='dead'?'selected':''}>Slow / dead stock</option></select>
+      <span class="small muted right">${rows.length} shown${archived?` · ${archived} archived`:''}</span>
+    </div>
+    <div class="tw"><table><thead><tr><th>Product</th><th>Status</th><th class="n">In stock</th><th class="n">Buy</th><th class="n">Sell</th><th class="n">Margin</th><th class="n">Sold/day</th><th class="n">Days left</th><th class="n">Reorder at</th><th></th></tr></thead><tbody>
+    ${rows.length?rows.map(p=>{ const m = num(p.price)>0 ? (num(p.price)-num(p.cost))/num(p.price)*100 : 0;
+      return `<tr><td><b>${esc(p.name)}</b><span class="meta">${[p.sku,p.category,p.supplier].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}${p.tracksExpiry?' · <span class="pill mute" style="padding:0 6px">expiry</span>':''}</span></td>
+      <td>${statusPill(p.status)}${p.dead?' <span class="pill mute">Slow</span>':''}${num(p.stock)<0?' <span class="pill bad">Recount</span>':''}</td>
+      <td class="n"><b>${qtyf(p.stock)}</b> <span class="muted small">${esc(p.unit||'')}</span></td><td class="n">${kes2(p.cost)}</td><td class="n">${kes2(p.price)}</td>
+      <td class="n" style="${m<5?'color:var(--bad)':''}">${Math.round(m)}%</td><td class="n">${p.avg?p.avg.toFixed(1):'–'}</td><td class="n">${p.cover===Infinity?'–':Math.floor(p.cover)}</td><td class="n">${qtyf(p.reorder)}</td>
+      <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="adjust" data-id="${p.id}" ${dis()}>Adjust</button> <button class="btn sm" data-act="edit-product" data-id="${p.id}" ${dis()}>Edit</button></td></tr>`; }).join('') : `<tr><td colspan="10"><p class="empty">${an.length?'No products match these filters.':'No products yet. Add one, or import a CSV list.'}</p></td></tr>`}
+    </tbody></table></div>
+  </div>
+  <input type="file" id="csv-file" accept=".csv,text/csv" class="hide">`;
+};
+
+/* ---------- Stock in ---------- */
+RENDER['stock-in'] = () => {
+  const si = UI.stockIn; const matches = findProducts(UI.siSearch);
+  const total = sum(si.lines, l=>num(l.qty)*num(l.cost));
+  const suppliers = [...new Set(Object.values(S.products).map(p=>p.supplier).filter(Boolean))].sort();
+  return head('Stock in','Record a delivery from a supplier. Stock and buying prices update when you save.') +
+  `<div class="grid" style="grid-template-columns:minmax(0,1fr)">
+  <div class="card">
+    <div class="fgrid" style="margin-bottom:14px">
+      <div class="field"><label for="si-supplier">Supplier</label><input type="text" id="si-supplier" list="sup-list" value="${esc(si.supplier)}" placeholder="e.g. Bidco distributor"><datalist id="sup-list">${suppliers.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+      <div class="field"><label for="si-invoice">Invoice / delivery note no.</label><input type="text" id="si-invoice" value="${esc(si.invoice)}"></div>
+      <div class="field"><label for="si-date">Date received</label><input type="date" id="si-date" value="${esc(si.date)}"></div>
+    </div>
+    <div class="sugg" style="margin-bottom:12px">
+      <input type="search" id="si-search" placeholder="Add item: type product name or scan barcode" value="${esc(UI.siSearch)}" autocomplete="off" aria-label="Add item to delivery">
+      ${matches.length?`<div class="sugg-list">${matches.map((p,i)=>`<button type="button" class="${i===0?'hl':''}" data-act="si-add" data-id="${p.id}"><b>${esc(p.name)}</b><span>last cost ${kes2(p.cost)} · ${qtyf(p.stock)} in stock</span></button>`).join('')}</div>`:''}
+    </div>
+    <div class="tw"><table><thead><tr><th>Product</th><th class="n">Qty received</th><th class="n">Unit cost (KES)</th><th>Expiry date</th><th class="n">Line total</th><th></th></tr></thead><tbody>
+    ${si.lines.length?si.lines.map((l,i)=>{ const p=S.products[l.pid]||{}; const warn = num(l.cost)>=num(p.price) && num(l.cost)>0;
+      return `<tr><td>${esc(p.name||l.name)}<span class="meta">${qtyf(p.stock)} in stock · sells at ${kes2(p.price)}${warn?' · <span style="color:var(--bad)">cost is at or above selling price</span>':''}</span></td>
+      <td class="n"><input class="cell" type="number" min="0" step="any" id="sil-q-${i}" data-sil="${i}" data-f="qty" value="${esc(l.qty)}" aria-label="Quantity"></td>
+      <td class="n"><input class="cell" type="number" min="0" step="any" id="sil-c-${i}" data-sil="${i}" data-f="cost" value="${esc(l.cost)}" aria-label="Unit cost"></td>
+      <td>${p.tracksExpiry?`<input type="date" id="sil-e-${i}" data-sil="${i}" data-f="expiry" value="${esc(l.expiry||'')}" style="max-width:160px" aria-label="Expiry date">`:'<span class="muted small">Not tracked</span>'}</td>
+      <td class="n" id="sil-t-${i}">${kes2(num(l.qty)*num(l.cost))}</td><td><button class="btn sm" data-act="si-rm" data-i="${i}" aria-label="Remove line">${icon('x')}</button></td></tr>`; }).join(''):'<tr><td colspan="6"><p class="empty">No items yet. Search above to add what arrived.</p></td></tr>'}
+    </tbody></table></div>
+    <div class="row" style="margin-top:14px"><span>Delivery total: <b class="num" id="si-total">${kes(total)}</b></span><span class="right"></span>${si.lines.length?'<button class="btn" data-act="si-clear">Clear</button>':''}<button class="btn pri" data-act="si-save" ${si.lines.length&&S.canWrite?'':'disabled'}>Save delivery</button></div>
+  </div>
+  <div class="card"><div class="ch"><h2>Recent deliveries</h2></div>
+    ${S.receipts.length?`<div class="tw"><table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice</th><th>Items</th><th class="n">Total</th></tr></thead><tbody>${S.receipts.slice(0,15).map(r=>`<tr><td>${fmtD(r.date)}</td><td>${esc(r.supplier||'–')}</td><td>${esc(r.invoice||'–')}</td><td>${(r.items||[]).map(i=>esc(i.name)+' ×'+qtyf(i.qty)).join(', ')}</td><td class="n">${kes(r.total)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">No deliveries recorded yet.</p>'}
+  </div></div>`;
+};
+
+/* ---------- Expiry ---------- */
+RENDER.expiry = () => {
+  const bl = batchList(); const groups = {expired:[],week:[],soon:[],ok:[]}; bl.forEach(b=>groups[b.st].push(b));
+  const tracked = activeProducts().filter(p=>p.tracksExpiry);
+  const untrackedQty = tracked.map(p=>({p, diff:num(p.stock)-sum(bl.filter(b=>b.pid===p.id),b=>num(b.qty))})).filter(x=>x.diff>0);
+  const table = (arr) => arr.length?`<div class="tw"><table><thead><tr><th>Product</th><th>Expiry</th><th>Status</th><th class="n">Qty</th><th class="n">Value</th><th class="n">Received</th><th></th></tr></thead><tbody>${arr.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td>${fmtD(b.expiry)}</td><td>${expiryPill(b)}</td><td class="n">${qtyf(b.qty)} ${esc(b.unit||'')}</td><td class="n">${kes(b.value)}</td><td class="n">${b.received?fmtDate(b.received):'–'}</td><td class="n"><button class="btn sm" data-act="writeoff" data-id="${b.id}" ${dis()}>Write off</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">None.</p>';
+  return head('Expiry tracking', `Batches are recorded when you receive stock with an expiry date. Sales use up the earliest-expiring batch first.`) +
+  `<div class="tiles">
+    <div class="tile ${groups.expired.length?'bad':''}"><span class="k">Already expired</span><span class="v">${groups.expired.length}</span><span class="s">${kes(sum(groups.expired,b=>b.value))}, remove from shelf</span></div>
+    <div class="tile ${groups.week.length?'bad':''}"><span class="k">Within 7 days</span><span class="v">${groups.week.length}</span><span class="s">${kes(sum(groups.week,b=>b.value))}, push or discount</span></div>
+    <div class="tile ${groups.soon.length?'warn':''}"><span class="k">Within ${S.settings.expiryWarnDays} days</span><span class="v">${groups.soon.length}</span><span class="s">${kes(sum(groups.soon,b=>b.value))}</span></div>
+    <div class="tile"><span class="k">Products tracking expiry</span><span class="v">${tracked.length}</span><span class="s">Turn on per product in Edit</span></div>
+  </div>
+  <div class="grid">
+    <div class="card"><div class="ch"><h2>Expired</h2><span class="sub">Write these off so stock and value stay correct</span></div>${table(groups.expired)}</div>
+    <div class="card"><div class="ch"><h2>Expiring within 7 days</h2></div>${table(groups.week)}</div>
+    <div class="card"><div class="ch"><h2>Expiring within ${S.settings.expiryWarnDays} days</h2></div>${table(groups.soon)}</div>
+    <div class="card"><div class="ch"><h2>Later</h2></div>${table(groups.ok)}</div>
+    ${untrackedQty.length?`<div class="card"><div class="ch"><h2>Stock with no expiry date</h2><span class="sub">Opening stock or items received without a date. Add a batch to track them.</span></div><div class="list">${untrackedQty.map(x=>`<div class="li"><div class="l"><b>${esc(x.p.name)}</b><span>${qtyf(x.diff)} ${esc(x.p.unit||'')} without a date</span></div><div class="r"><button class="btn sm" data-act="add-batch" data-id="${x.p.id}" data-q="${x.diff}" ${dis()}>Add expiry date</button></div></div>`).join('')}</div></div>`:''}
+  </div>`;
+};
+
+/* ---------- Credit customers ---------- */
+RENDER.credit = () => {
+  const q = UI.custSearch.toLowerCase();
+  const custs = Object.values(S.customers).filter(c=>!q || c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)).sort((a,b)=>num(b.balance)-num(a.balance) || a.name.localeCompare(b.name));
+  const owed = owedTotal();
+  const monthAgo = Date.now()-30*DAY;
+  const credit30 = sum(S.sales.filter(s=>s.method==='credit'&&s.ts>=monthAgo),s=>num(s.total));
+  const paid30 = sum(S.payments.filter(p=>p.ts>=monthAgo),p=>num(p.amount));
+  return head('Credit customers','Who owes the shop, and what they have paid back.', `<button class="btn pri" data-act="new-cust" ${dis()}>${icon('plus')} Add customer</button>`) +
+  `<div class="tiles">
+    <div class="tile ${owed?'warn':''}"><span class="k">Total owed</span><span class="v">${kes(owed)}</span><span class="s">${custs.filter(c=>num(c.balance)>0).length} customers with a balance</span></div>
+    <div class="tile"><span class="k">Credit given, 30 days</span><span class="v">${kes(credit30)}</span></div>
+    <div class="tile ok"><span class="k">Paid back, 30 days</span><span class="v">${kes(paid30)}</span></div>
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:12px"><input type="search" id="cust-search" placeholder="Search name or phone" value="${esc(UI.custSearch)}" style="max-width:300px" aria-label="Search customers"></div>
+  <div class="tw"><table><thead><tr><th>Customer</th><th>Phone</th><th class="n">Owes</th><th class="n">Limit</th><th>Last activity</th><th></th></tr></thead><tbody>
+  ${custs.length?custs.map(c=>{ const over = num(c.limit)>0 && num(c.balance)>num(c.limit); const age = c.lastTs?Math.floor((Date.now()-c.lastTs)/DAY):null;
+    return `<tr><td><b>${esc(c.name)}</b>${over?' <span class="pill bad">Over limit</span>':''}${num(c.balance)>0&&c.lastPayTs&&(Date.now()-c.lastPayTs)/DAY>30?' <span class="pill warn">No payment 30d+</span>':''}</td><td>${esc(c.phone||'–')}</td><td class="n"><b>${kes(c.balance)}</b></td><td class="n">${num(c.limit)?kes(c.limit):'–'}</td><td>${age===null?'–':age===0?'Today':age+' days ago'}</td>
+    <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="statement" data-id="${c.id}">Statement</button> <button class="btn sm pri" data-act="pay-debt" data-id="${c.id}" ${dis()}>Record payment</button> <button class="btn sm" data-act="edit-cust" data-id="${c.id}" ${dis()}>Edit</button></td></tr>`; }).join(''):'<tr><td colspan="6"><p class="empty">No credit customers yet. They are added here or when you make a credit sale.</p></td></tr>'}
+  </tbody></table></div></div>`;
+};
+
+/* ---------- Stock take ---------- */
+RENDER['stock-take'] = () => {
+  const all = activeProducts(); const cats = [...new Set(all.map(p=>p.category).filter(Boolean))].sort();
+  const q = UI.countSearch.toLowerCase();
+  const rows = all.filter(p=>(!UI.countCat || p.category===UI.countCat) && (!q || p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q)));
+  const counted = Object.entries(UI.count).filter(([id,v])=>v!=='' && S.products[id]);
+  const variances = counted.map(([id,v])=>{ const p=S.products[id]; const d=num(v)-num(p.stock); return {p,d,val:d*num(p.cost)}; }).filter(x=>x.d!==0);
+  const last = S.stocktakes[0];
+  return head('Stock take','Count what is on the shelf. Leave a row blank to skip it. Posting sets stock to your count and logs the difference.') +
+  `${last?`<div class="banner info">Last stock take: ${fmtDT(last.ts)} · ${last.lines.length} items counted · variance ${kes(last.totalValue)}</div>`:''}
+  <div class="tiles">
+    <div class="tile"><span class="k">Counted so far</span><span class="v" id="st-counted">${counted.length} / ${all.length}</span></div>
+    <div class="tile ${variances.length?'warn':''}"><span class="k">Items with a difference</span><span class="v" id="st-var">${variances.length}</span></div>
+    <div class="tile ${sum(variances,x=>x.val)<0?'bad':''}"><span class="k">Variance value (at cost)</span><span class="v" id="st-val">${kes(sum(variances,x=>x.val))}</span><span class="s">Negative means stock is missing</span></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <input type="search" id="count-search" placeholder="Find product" value="${esc(UI.countSearch)}" style="max-width:260px" aria-label="Find product">
+      <select id="count-cat" style="max-width:200px" aria-label="Category"><option value="">All categories</option>${cats.map(c=>`<option ${UI.countCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <span class="right"></span>
+      <button class="btn" data-act="count-fill" title="Copy system quantity into blank rows shown">Fill blanks with system qty</button>
+      <button class="btn" data-act="count-clear">Clear counts</button>
+      <button class="btn pri" data-act="count-post" ${counted.length&&S.canWrite?'':'disabled'}>Post stock take</button>
+    </div>
+    <div class="tw"><table><thead><tr><th>Product</th><th class="n">System qty</th><th class="n">Counted</th><th class="n">Difference</th><th class="n">Value</th></tr></thead><tbody>
+    ${rows.length?rows.map(p=>{ const v = UI.count[p.id]; const has = v!==undefined && v!==''; const d = has?num(v)-num(p.stock):0;
+      return `<tr><td><b>${esc(p.name)}</b><span class="meta">${esc(p.category||'')}${p.sku?' · '+esc(p.sku):''}</span></td><td class="n">${qtyf(p.stock)} ${esc(p.unit||'')}</td>
+      <td class="n"><input class="cell" type="number" min="0" step="any" inputmode="decimal" id="cnt-${p.id}" data-cnt="${p.id}" value="${has?esc(v):''}" aria-label="Counted ${esc(p.name)}"></td>
+      <td class="n" id="cd-${p.id}" style="${d<0?'color:var(--bad)':d>0?'color:var(--ok)':''}">${has?(d>0?'+':'')+qtyf(d):''}</td><td class="n" id="cv-${p.id}">${has&&d?kes(d*num(p.cost)):''}</td></tr>`; }).join(''):'<tr><td colspan="5"><p class="empty">No products to count.</p></td></tr>'}
+    </tbody></table></div>
+  </div>`;
+};
+
+/* ---------- Reports ---------- */
+async function loadReport(){
+  const r = UI.rep; r.loading = true; schedule();
+  try{
+    const from = startOfDay(r.from), to = startOfDay(r.to)+DAY;
+    const [ss, aa, pp] = await Promise.all([
+      db.collection('sales').where('ts','>=',from).where('ts','<',to).limit(1000).get(),
+      db.collection('adjustments').where('ts','>=',from).where('ts','<',to).limit(1000).get(),
+      db.collection('payments').where('ts','>=',from).where('ts','<',to).limit(1000).get()
+    ]);
+    r.data = { sales: ss.docs.map(d=>({id:d.id,...d.data()})), adj: aa.docs.map(d=>({id:d.id,...d.data()})), pay: pp.docs.map(d=>({id:d.id,...d.data()})), capped: ss.size>=1000 };
+  }catch(e){ toast(errMsg(e), true); r.data = null; }
+  r.loading = false; schedule();
+}
+function reportCalc(){
+  const d = UI.rep.data; if(!d) return null;
+  const rev = sum(d.sales,s=>num(s.total)), cost = sum(d.sales,s=>num(s.costTotal));
+  const byM = {}; d.sales.forEach(s=>byM[s.method]=(byM[s.method]||0)+num(s.total));
+  const byP = {}, byC = {};
+  d.sales.forEach(s=>(s.items||[]).forEach(i=>{ const k=i.pid; const p=S.products[k]; const cat=(p&&p.category)||'Uncategorised';
+    byP[k]=byP[k]||{name:i.name,cat,qty:0,rev:0,cost:0}; byP[k].qty+=num(i.qty); byP[k].rev+=num(i.qty)*num(i.price); byP[k].cost+=num(i.qty)*num(i.cost);
+    byC[cat]=byC[cat]||{rev:0,cost:0}; byC[cat].rev+=num(i.qty)*num(i.price); byC[cat].cost+=num(i.qty)*num(i.cost); }));
+  const losses = d.adj.filter(a=>num(a.qty)<0); const lossVal = -sum(losses,a=>num(a.value));
+  const byR = {}; losses.forEach(a=>byR[a.reason]=(byR[a.reason]||0)-num(a.value));
+  const days = Math.max(1, daysBetween(UI.rep.from, UI.rep.to)+1);
+  return {rev,cost,gp:rev-cost,count:d.sales.length,byM,byP:Object.values(byP).sort((a,b)=>b.rev-a.rev),byC:Object.entries(byC).sort((a,b)=>b[1].rev-a[1].rev),lossVal,byR,paid:sum(d.pay,p=>num(p.amount)),days};
+}
+RENDER.reports = () => {
+  const r = UI.rep; const c = reportCalc();
+  const quick = [['Today',0,0],['Last 7 days',6,0],['Last 30 days',29,0],['This month','m',0]];
+  const months = Object.entries(S.summaries).sort((a,b)=>b[0].localeCompare(a[0]));
+  return head('Reports','Sales, profit, losses and payments for any date range.', c?`<button class="btn" data-act="export-report">${icon('down')} Export CSV</button>`:'') +
+  `<div class="card" style="margin-bottom:16px"><div class="row">
+    <div class="field" style="max-width:170px"><label for="rep-from">From</label><input type="date" id="rep-from" value="${esc(r.from)}"></div>
+    <div class="field" style="max-width:170px"><label for="rep-to">To</label><input type="date" id="rep-to" value="${esc(r.to)}"></div>
+    <div class="row" style="align-self:flex-end">${quick.map(([l,a])=>`<button class="btn sm" data-act="rep-quick" data-a="${a}">${l}</button>`).join('')}</div>
+    <button class="btn pri" data-act="rep-run" style="align-self:flex-end">Show report</button>
+  </div></div>
+  ${r.loading?'<p class="muted">Loading…</p>':!c?'<p class="empty">Choose a date range and press Show report.</p>':`
+  ${r.data.capped?'<div class="banner warn">This range has more than 1,000 sales; only the first 1,000 are counted. Choose a shorter range.</div>':''}
+  <div class="tiles">
+    <div class="tile ok"><span class="k">Sales</span><span class="v">${kes(c.rev)}</span><span class="s">${c.count} sales · avg ${kes(c.rev/c.days)}/day</span></div>
+    <div class="tile"><span class="k">Gross profit</span><span class="v">${kes(c.gp)}</span><span class="s">${c.rev?(c.gp/c.rev*100).toFixed(1)+'% margin':'–'}</span></div>
+    <div class="tile"><span class="k">Average basket</span><span class="v">${kes(c.count?c.rev/c.count:0)}</span></div>
+    <div class="tile ${c.lossVal?'bad':''}"><span class="k">Losses written off</span><span class="v">${kes(c.lossVal)}</span><span class="s">${Object.entries(c.byR).map(([k,v])=>REASONS[k]+' '+kes(v)).join(' · ')||'None'}</span></div>
+    <div class="tile"><span class="k">Credit payments received</span><span class="v">${kes(c.paid)}</span></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="ch"><h2>By payment method</h2></div><div class="list">${Object.keys(METHODS).map(k=>`<div class="li"><div class="l"><b>${METHODS[k]}</b><span>${c.rev?Math.round((c.byM[k]||0)/c.rev*100):0}% of sales</span></div><div class="r">${kes(c.byM[k]||0)}</div></div>`).join('')}</div></div>
+    <div class="card"><div class="ch"><h2>By category</h2></div>${c.byC.length?`<div class="tw"><table><thead><tr><th>Category</th><th class="n">Sales</th><th class="n">Profit</th><th class="n">Margin</th></tr></thead><tbody>${c.byC.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${kes(v.rev)}</td><td class="n">${kes(v.rev-v.cost)}</td><td class="n">${v.rev?Math.round((v.rev-v.cost)/v.rev*100):0}%</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">No sales.</p>'}</div>
+  </div>
+  <div class="card" style="margin-top:16px"><div class="ch"><h2>By product</h2></div>${c.byP.length?`<div class="tw"><table><thead><tr><th>Product</th><th>Category</th><th class="n">Qty sold</th><th class="n">Sales</th><th class="n">Profit</th><th class="n">Margin</th></tr></thead><tbody>${c.byP.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td class="n">${qtyf(p.qty)}</td><td class="n">${kes(p.rev)}</td><td class="n">${kes(p.rev-p.cost)}</td><td class="n">${p.rev?Math.round((p.rev-p.cost)/p.rev*100):0}%</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">No sales in this range.</p>'}</div>`}
+  ${months.length?`<div class="card" style="margin-top:16px"><div class="ch"><h2>Archived months</h2><span class="sub">Totals kept after old records were archived</span></div><div class="tw"><table><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">Profit</th><th class="n">No. of sales</th><th class="n">Losses</th></tr></thead><tbody>${months.map(([k,m])=>`<tr><td>${k}</td><td class="n">${kes(m.revenue)}</td><td class="n">${kes(num(m.revenue)-num(m.cost))}</td><td class="n">${qtyf(m.count)}</td><td class="n">${kes(m.losses)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
+};
+AFTER.reports = () => { if(!UI.rep.data && !UI.rep.loading && db) loadReport(); };
+
+/* ---------- History ---------- */
+RENDER.history = () => {
+  const ev = [];
+  S.sales.forEach(s=>ev.push({ts:s.ts,type:'sale',title:`Sale · ${METHODS[s.method]||s.method}${s.cname?' · '+s.cname:''}${s.ref?' · '+s.ref:''}`,detail:(s.items||[]).map(i=>`${i.name} ×${qtyf(i.qty)}`).join(', '),amt:num(s.total),by:s.by}));
+  S.receipts.forEach(r=>ev.push({ts:r.ts,type:'in',title:`Stock in · ${r.supplier||'No supplier'}${r.invoice?' · #'+r.invoice:''}`,detail:(r.items||[]).map(i=>`${i.name} +${qtyf(i.qty)}`).join(', '),amt:num(r.total),by:r.by}));
+  S.adjustments.forEach(a=>ev.push({ts:a.ts,type:'adj',title:`Adjustment · ${REASONS[a.reason]||a.reason}`,detail:`${a.name} ${num(a.qty)>0?'+':''}${qtyf(a.qty)}${a.note?' · '+a.note:''}`,amt:num(a.value),by:a.by}));
+  S.payments.forEach(p=>ev.push({ts:p.ts,type:'pay',title:`Credit payment · ${p.cname||''}`,detail:`${METHODS[p.method]||p.method}${p.ref?' · '+p.ref:''}`,amt:num(p.amount),by:p.by}));
+  ev.sort((a,b)=>b.ts-a.ts);
+  const list = ev.filter(e=>!UI.histType||e.type===UI.histType).slice(0,300);
+  const tag = {sale:'<span class="pill acc">Sale</span>',in:'<span class="pill ok">Stock in</span>',adj:'<span class="pill warn">Adjust</span>',pay:'<span class="pill mute">Payment</span>'};
+  return head('History','Every stock movement and payment, newest first. Sales from the last 35 days are shown; older ones are in Reports.') +
+  `<div class="card"><div class="row" style="margin-bottom:12px"><select id="hist-type" style="max-width:220px" aria-label="Type"><option value="">All movements</option><option value="sale" ${UI.histType==='sale'?'selected':''}>Sales</option><option value="in" ${UI.histType==='in'?'selected':''}>Stock in</option><option value="adj" ${UI.histType==='adj'?'selected':''}>Adjustments & write-offs</option><option value="pay" ${UI.histType==='pay'?'selected':''}>Credit payments</option></select><span class="small muted right">${list.length} entries</span></div>
+  <div class="tw"><table><thead><tr><th>When</th><th>Type</th><th>Details</th><th>By</th><th class="n">Amount</th></tr></thead><tbody>
+  ${list.length?list.map(e=>`<tr><td style="white-space:nowrap">${fmtDT(e.ts)}</td><td>${tag[e.type]}</td><td>${esc(e.title)}<span class="meta">${esc(e.detail)}</span></td><td class="small" data-uid="${esc(e.by||'')}">${e.by?'…':'–'}</td><td class="n">${kes(e.amt)}</td></tr>`).join(''):'<tr><td colspan="5"><p class="empty">Nothing recorded yet.</p></td></tr>'}
+  </tbody></table></div></div>`;
+};
+AFTER.history = () => {
+  document.querySelectorAll('[data-uid]').forEach(el=>{ const id = el.dataset.uid; if(!id) return; el.textContent = id===S.me ? 'You' : (S.staff[id]&&S.staff[id].name) || id.split('@')[0]; });
+};
+
+/* ---------- Settings ---------- */
+RENDER['shop-settings'] = () => {
+  const st = S.settings; const cutoff = Date.now()-num(st.archiveDays)*DAY;
+  return head('Settings','Shop details, alert thresholds and data tools.') +
+  `<div class="grid g2">
+    <div class="card"><h2 style="margin-bottom:12px">Shop & alerts</h2>
+      <div class="fgrid">
+        <div class="field"><label for="set-name">Shop name</label><input type="text" id="set-name" value="${esc(st.shopName)}"></div>
+        <div class="field"><label for="set-exp">Warn about expiry (days ahead)</label><input type="number" id="set-exp" min="1" value="${esc(st.expiryWarnDays)}"></div>
+        <div class="field"><label for="set-dead">Slow stock after (days unsold)</label><input type="number" id="set-dead" min="1" value="${esc(st.deadDays)}"></div>
+        <div class="field"><label for="set-cover">Order enough for (days after delivery)</label><input type="number" id="set-cover" min="1" value="${esc(st.coverDays)}"></div>
+      </div>
+      <p class="small muted">Reorder suggestion = average daily sales over 30 days × (supplier lead time + days of cover) − stock on hand.</p>
+      <button class="btn pri" data-act="save-settings" ${dis()}>Save settings</button>
+    </div>
+    <div class="card"><h2 style="margin-bottom:12px">Data</h2>
+      <div class="list">
+        <div class="li"><div class="l"><b>Export everything</b><span>Products, customers, and recent sales, deliveries and adjustments as one JSON file.</span></div><div class="r"><button class="btn sm" data-act="export-all">${icon('down')} Export</button></div></div>
+        <div class="li"><div class="l"><b>Archive old records</b><span>Rolls sales, deliveries and adjustments older than <input type="number" id="set-arch" min="60" value="${esc(st.archiveDays)}" style="width:70px;padding:2px 6px"> days into monthly totals, keeping the shop fast.</span></div><div class="r"><button class="btn sm" data-act="archive" ${dis()}>Archive</button></div></div>
+        <div class="li"><div class="l"><b>Example data</b><span>Load example products, customers and sales to explore, or remove them.</span></div><div class="r row"><button class="btn sm" data-act="load-sample" ${S.role==='owner'?'':'disabled'}>Load</button><button class="btn sm danger" data-act="clear-sample" ${dis()}>Clear</button></div></div>
+      </div>
+    </div>
+    ${S.role==='owner'?`<div class="card"><h2 style="margin-bottom:4px">Staff</h2><p class="small muted" style="margin:0 0 12px">People who can sign in with Google and use this shop. Only the owner can change this list.</p>
+      <div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><input type="text" id="staff-email" placeholder="name@gmail.com" aria-label="Staff Google email"><input type="text" id="staff-name" placeholder="Name (optional)" aria-label="Staff name" style="max-width:160px"><button class="btn pri" data-act="add-staff">Add</button></div>
+      <div class="list">${Object.values(S.staff).sort((a,b)=>(a.role==='owner'?-1:1)-(b.role==='owner'?-1:1)||a.id.localeCompare(b.id)).map(m=>`<div class="li"><div class="l"><b>${esc(m.name||m.id.split('@')[0])}</b><span>${esc(m.id)}</span></div><div class="r">${m.role==='owner'?'<span class="pill acc">Owner</span>':`<button class="btn sm danger" data-act="rm-staff" data-id="${esc(m.id)}">Remove</button>`}</div></div>`).join('')}</div></div>`:''}
+    <div class="card"><h2 style="margin-bottom:8px">CSV import format</h2>
+      <p class="small muted">On the Products page, Import CSV accepts these columns (first row is the header). Rows with a barcode/SKU that already exists update that product.</p>
+      <div class="receipt">name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry
+Sugar 1kg,6161100410013,Groceries,pkt,145,165,40,15,3,Mumias Dist.,no
+Fresh Milk 500ml,6164001234567,Dairy,pkt,52,60,48,24,1,Brookside,yes</div>
+      <button class="btn sm" data-act="copy-template" style="margin-top:10px">Copy template</button>
+    </div>
+  </div>`;
+};
+
+/* ---------------- modal + toast ---------------- */
+function openModal(html, wide=false){
+  $('#modal-root').innerHTML = `<div class="scrim" data-act="scrim"><div class="modal ${wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`;
+  const f = $('#modal-root input:not([type=hidden]), #modal-root select'); if(f) f.focus();
+}
+function closeModal(){ $('#modal-root').innerHTML = ''; }
+let toastT;
+function toast(msg, bad=false){ let t = $('.toast'); if(!t){ t = document.createElement('div'); document.body.appendChild(t); } t.className = 'toast'+(bad?' bad':''); t.textContent = msg; clearTimeout(toastT); toastT = setTimeout(()=>t.remove(), bad?6000:2800); }
+function errMsg(e){
+  const c = e && e.code;
+  if(c==='permission-denied') return 'You are not allowed to change this. Ask the shop owner to add your email under Settings > Staff.';
+  if(c==='resource-exhausted') return 'Firebase usage limit reached for today. Try again later or upgrade the Firebase plan.';
+  if(c==='unauthenticated') return 'Your sign-in expired. Reload the page and sign in again.';
+  if(c==='invalid_argument') return S.canWrite ? 'That change could not be saved. Check the values and try again.' : 'You have view-only access, so this was not saved.';
+  if(c==='quota_exceeded') return 'Storage is full. Archive old records in Settings, then try again.';
+  if(c==='resource_exhausted') return 'Too many changes at once. Wait a moment and try again.';
+  if(c==='revoked') return 'Your access to this shop changed. Reload the page.';
+  return 'Could not save right now. Check your connection and try again.';
+}
+function confirmBox(title, text, okLabel='Confirm', danger=false){
+  return new Promise(res=>{
+    openModal(`<h2>${title}</h2><p class="muted" style="margin:0">${text}</p><div class="mf"><button class="btn" id="cb-no">Cancel</button><button class="btn ${danger?'danger':'pri'}" id="cb-yes">${okLabel}</button></div>`);
+    $('#cb-no').onclick = ()=>{ closeModal(); res(false); };
+    $('#cb-yes').onclick = ()=>{ closeModal(); res(true); };
+  });
+}
+let busy = false;
+async function guarded(fn){ if(busy) return; busy = true; try{ await fn(); }catch(e){ console.error(e); toast(errMsg(e), true); } finally{ busy = false; } }
+
+/* ---------------- write operations ---------------- */
+async function retry(fn){ try{ return await fn(); }catch(e){ if(e && e.code==='unavailable'){ await new Promise(r=>setTimeout(r,400+Math.random()*600)); return fn(); } throw e; } }
+const upd = (path, data) => retry(()=>db.doc(path).update(data));
+const add = (col, data) => retry(()=>db.collection(col).add(data));
+
+async function depleteBatches(pid, qty){
+  let left = qty;
+  const bs = Object.values(S.batches).filter(b=>b.pid===pid && num(b.qty)>0).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+  for(const b of bs){ if(left<=0) break; const take = Math.min(num(b.qty), left); left -= take; await upd('batches/'+b.id, {qty: +(num(b.qty)-take).toFixed(3)}); }
+}
+async function changeStock(pid, delta, extra={}){
+  const p = S.products[pid]; if(!p) return;
+  await upd('products/'+pid, {stock: +(num(p.stock)+delta).toFixed(3), ...extra});
+  if(delta<0 && p.tracksExpiry) await depleteBatches(pid, -delta);
+}
+
+async function completeSale(){
+  if(!UI.basket.length) return;
+  const lines = UI.basket.filter(l=>num(l.qty)>0);
+  if(!lines.length){ toast('Set a quantity for at least one item.', true); return; }
+  const m = UI.payMethod; let cust = null;
+  if(m==='credit'){ cust = S.customers[UI.saleCust]; if(!cust){ toast('Choose the customer for this credit sale.', true); return; } }
+  const ts = Date.now();
+  const items = lines.map(l=>({pid:l.pid, name:l.name, qty:num(l.qty), price:num(l.price), cost:num((S.products[l.pid]||{}).cost)}));
+  const total = sum(items,i=>i.qty*i.price), costTotal = sum(items,i=>i.qty*i.cost);
+  const sale = {ts, date:ymd(ts), items, total, costTotal, method:m, by:S.me||null};
+  if(cust){ sale.cid = cust.id; sale.cname = cust.name; }
+  if(m==='mpesa' && UI.saleRef.trim()) sale.ref = UI.saleRef.trim().toUpperCase();
+  if(m==='cash' && num(UI.tendered)>0) sale.tendered = num(UI.tendered);
+  await add('sales', sale);
+  for(const i of items) await changeStock(i.pid, -i.qty, {lastSold: ts});
+  if(cust) await upd('customers/'+cust.id, {balance: num(cust.balance)+total, lastTs: ts});
+  UI.lastSale = sale; UI.basket = []; UI.saleSearch=''; UI.saleRef=''; UI.tendered=''; UI.saleCust=''; UI.payMethod='cash';
+  schedule();
+}
+function addToBasket(pid){
+  const p = S.products[pid]; if(!p) return;
+  const ex = UI.basket.find(l=>l.pid===pid);
+  if(ex) ex.qty = num(ex.qty)+1; else UI.basket.push({pid, name:p.name, price:num(p.price), qty:1});
+  UI.saleSearch=''; const s=$('#sale-search'); if(s) s.value='';
+  schedule(); setTimeout(()=>{ const s=$('#sale-search'); if(s) s.focus(); },30);
+}
+
+async function saveStockIn(){
+  const si = UI.stockIn; const lines = si.lines.filter(l=>num(l.qty)>0);
+  if(!lines.length){ toast('Enter the quantity received for at least one item.', true); return; }
+  const missing = lines.find(l=>S.products[l.pid]?.tracksExpiry && !l.expiry);
+  if(missing && !(await confirmBox('No expiry date', `${esc(S.products[missing.pid].name)} tracks expiry but has no date. Save anyway? That stock won't show on the Expiry page.`, 'Save anyway'))) return;
+  const ts = si.date===today() ? Date.now() : startOfDay(si.date)+12*3600000;
+  const items = lines.map(l=>({pid:l.pid, name:S.products[l.pid]?.name||l.name, qty:num(l.qty), cost:num(l.cost), expiry:l.expiry||null}));
+  await add('receipts', {ts, date:si.date, supplier:si.supplier.trim(), invoice:si.invoice.trim(), items, total:sum(items,i=>i.qty*i.cost), by:S.me||null});
+  for(const i of items){
+    const p = S.products[i.pid]; const extra = {};
+    if(i.cost>0) extra.cost = i.cost;
+    if(si.supplier.trim() && !p.supplier) extra.supplier = si.supplier.trim();
+    await changeStock(i.pid, i.qty, extra);
+    if(i.expiry && p.tracksExpiry) await add('batches', {pid:i.pid, qty:i.qty, expiry:i.expiry, received:ts});
+  }
+  UI.stockIn = {supplier:'', invoice:'', date:today(), lines:[]};
+  toast(`Delivery saved: ${items.length} item${items.length===1?'':'s'}, ${kes(sum(items,i=>i.qty*i.cost))}.`);
+  schedule();
+}
+
+async function postCount(){
+  const entries = Object.entries(UI.count).filter(([id,v])=>v!=='' && S.products[id]);
+  const lines = entries.map(([id,v])=>{ const p=S.products[id]; return {pid:id, name:p.name, system:num(p.stock), counted:num(v), diff:+(num(v)-num(p.stock)).toFixed(3), cost:num(p.cost)}; });
+  const vars = lines.filter(l=>l.diff!==0); const tv = sum(vars,l=>l.diff*l.cost);
+  if(!(await confirmBox('Post stock take?', `${lines.length} items counted, ${vars.length} with a difference worth ${kes(tv)}. Stock will be set to your counts.`, 'Post stock take'))) return;
+  const ts = Date.now();
+  for(const l of vars){
+    await add('adjustments', {ts, date:ymd(ts), pid:l.pid, name:l.name, qty:l.diff, reason:'count', value:l.diff*l.cost, note:`System ${qtyf(l.system)}, counted ${qtyf(l.counted)}`, by:S.me||null});
+    await changeStock(l.pid, l.diff);
+  }
+  await add('stocktakes', {ts, date:ymd(ts), lines, totalValue:tv, by:S.me||null});
+  UI.count = {}; toast('Stock take posted.'); schedule();
+}
+
+/* ---------------- forms (modals) ---------------- */
+function productForm(id){
+  const p = id ? S.products[id] : {unit:'pcs', leadDays:2, reorder:5, stock:0};
+  const cats = [...new Set(Object.values(S.products).map(x=>x.category).filter(Boolean))].sort();
+  const sups = [...new Set(Object.values(S.products).map(x=>x.supplier).filter(Boolean))].sort();
+  openModal(`<h2>${id?'Edit product':'Add product'}</h2>
+  <form id="pf" class="grid" style="gap:12px">
+    <div class="fgrid">
+      <div class="field" style="grid-column:1/-1"><label for="pf-name">Product name</label><input type="text" id="pf-name" required value="${esc(p.name||'')}" placeholder="e.g. Kimbo 1kg"></div>
+      <div class="field"><label for="pf-sku">Barcode / SKU</label><input type="text" id="pf-sku" value="${esc(p.sku||'')}"></div>
+      <div class="field"><label for="pf-cat">Category</label><input type="text" id="pf-cat" list="pf-cats" value="${esc(p.category||'')}" placeholder="e.g. Groceries"><datalist id="pf-cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="field"><label for="pf-unit">Unit</label><input type="text" id="pf-unit" value="${esc(p.unit||'')}" placeholder="pcs, pkt, kg, bottle"></div>
+      <div class="field"><label for="pf-cost">Buying price (KES)</label><input type="number" step="any" min="0" id="pf-cost" value="${esc(p.cost??'')}"></div>
+      <div class="field"><label for="pf-price">Selling price (KES)</label><input type="number" step="any" min="0" id="pf-price" value="${esc(p.price??'')}"></div>
+      ${id?'':`<div class="field"><label for="pf-stock">Opening stock</label><input type="number" step="any" id="pf-stock" value="${esc(p.stock??0)}"></div>`}
+      <div class="field"><label for="pf-reorder">Reorder when stock is at or below</label><input type="number" step="any" min="0" id="pf-reorder" value="${esc(p.reorder??'')}"></div>
+      <div class="field"><label for="pf-lead">Supplier lead time (days)</label><input type="number" min="0" id="pf-lead" value="${esc(p.leadDays??'')}"></div>
+      <div class="field"><label for="pf-sup">Supplier</label><input type="text" id="pf-sup" list="pf-sups" value="${esc(p.supplier||'')}"><datalist id="pf-sups">${sups.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="pf-exp" ${p.tracksExpiry?'checked':''}> Track expiry dates for this product (milk, bread, snacks…)</label>
+    <p class="small muted" id="pf-margin" style="margin:0"></p>
+    <div class="mf">${id?`<button type="button" class="btn danger" id="pf-arch" style="margin-right:auto">${p.archived?'Restore':'Archive'}</button>`:''}<button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn pri">${id?'Save changes':'Add product'}</button></div>
+  </form>`);
+  const mg = ()=>{ const c=num($('#pf-cost').value), pr=num($('#pf-price').value); $('#pf-margin').textContent = pr? `Margin ${Math.round((pr-c)/pr*100)}% · KES ${kes2(pr-c)} profit per unit` : ''; };
+  $('#pf-cost').oninput = mg; $('#pf-price').oninput = mg; mg();
+  if(id) $('#pf-arch').onclick = ()=>guarded(async()=>{ await upd('products/'+id, {archived:!p.archived}); closeModal(); toast(p.archived?'Product restored.':'Product archived. It no longer shows in lists.'); });
+  $('#pf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const name = $('#pf-name').value.trim(); if(!name){ toast('Enter a product name.', true); return; }
+    const sku = $('#pf-sku').value.trim();
+    const dup = sku && Object.values(S.products).find(x=>x.sku===sku && x.id!==id);
+    if(dup){ toast(`Barcode ${sku} is already used by ${dup.name}.`, true); return; }
+    const data = { name, sku, category:$('#pf-cat').value.trim(), unit:$('#pf-unit').value.trim(), cost:num($('#pf-cost').value), price:num($('#pf-price').value),
+      reorder:num($('#pf-reorder').value), leadDays:num($('#pf-lead').value), supplier:$('#pf-sup').value.trim(), tracksExpiry:$('#pf-exp').checked };
+    if(id) await upd('products/'+id, data);
+    else { const ref = db.collection('products').doc(); await retry(()=>ref.set({...data, id:ref.id, stock:num($('#pf-stock').value), created:Date.now(), archived:false})); }
+    closeModal(); toast(id?'Product saved.':'Product added.');
+  }); };
+}
+function adjustForm(id){
+  const p = S.products[id];
+  openModal(`<h2>Adjust stock · ${esc(p.name)}</h2><p class="muted" style="margin:0">System stock: <b>${qtyf(p.stock)} ${esc(p.unit||'')}</b>. Use this for damage, loss or items found. For deliveries use Stock in.</p>
+  <form id="af" class="grid" style="gap:12px"><div class="fgrid">
+    <div class="field"><label for="af-reason">Reason</label><select id="af-reason">${['damage','expired','theft','own','found','other'].map(k=>`<option value="${k}">${REASONS[k]}</option>`).join('')}</select></div>
+    <div class="field"><label for="af-qty">Quantity</label><input type="number" step="any" min="0" id="af-qty" required></div>
+    <div class="field" style="grid-column:1/-1"><label for="af-note">Note (optional)</label><input type="text" id="af-note" placeholder="e.g. Packets torn in delivery"></div>
+  </div><p class="small muted" id="af-prev" style="margin:0"></p>
+  <div class="mf"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn pri">Save adjustment</button></div></form>`);
+  const prev = ()=>{ const q=num($('#af-qty').value), r=$('#af-reason').value; const d = r==='found'||r==='other'&&false ? q : -q; const sign = r==='found'?1:-1; $('#af-prev').textContent = q? `Stock will go from ${qtyf(p.stock)} to ${qtyf(num(p.stock)+sign*q)} · value ${kes(sign*q*num(p.cost))}` : ''; };
+  $('#af-qty').oninput = prev; $('#af-reason').onchange = prev;
+  $('#af').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const q = num($('#af-qty').value); if(q<=0){ toast('Enter a quantity above zero.', true); return; }
+    const r = $('#af-reason').value; const delta = r==='found' ? q : -q; const ts = Date.now();
+    await add('adjustments', {ts, date:ymd(ts), pid:id, name:p.name, qty:delta, reason:r, value:delta*num(p.cost), note:$('#af-note').value.trim(), by:S.me||null});
+    await changeStock(id, delta);
+    closeModal(); toast('Adjustment saved.');
+  }); };
+}
+function writeOffForm(bid){
+  const b = S.batches[bid]; const p = S.products[b.pid]; const expired = daysBetween(today(), b.expiry) < 0;
+  openModal(`<h2>Write off · ${esc(p.name)}</h2><p class="muted" style="margin:0">Batch expiring ${fmtD(b.expiry)} has ${qtyf(b.qty)} ${esc(p.unit||'')} left.</p>
+  <form id="wf" class="grid" style="gap:12px"><div class="fgrid">
+    <div class="field"><label for="wf-qty">Quantity to remove</label><input type="number" step="any" min="0" max="${b.qty}" id="wf-qty" value="${b.qty}"></div>
+    <div class="field"><label for="wf-reason">Reason</label><select id="wf-reason"><option value="expired" ${expired?'selected':''}>Expired</option><option value="damage">Damaged</option><option value="own">Own use</option><option value="other" ${expired?'':'selected'}>Returned to supplier / other</option></select></div>
+  </div><div class="mf"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn danger">Write off</button></div></form>`);
+  $('#wf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const q = Math.min(num($('#wf-qty').value), num(b.qty)); if(q<=0){ toast('Enter a quantity above zero.', true); return; }
+    const ts = Date.now(); const r = $('#wf-reason').value;
+    await add('adjustments', {ts, date:ymd(ts), pid:p.id, name:p.name, qty:-q, reason:r, value:-q*num(p.cost), note:`Batch exp. ${b.expiry}`, by:S.me||null});
+    await upd('batches/'+bid, {qty:+(num(b.qty)-q).toFixed(3)});
+    await upd('products/'+p.id, {stock:+(num(p.stock)-q).toFixed(3)});
+    closeModal(); toast(`${qtyf(q)} ${p.unit||''} written off (${kes(q*num(p.cost))}).`);
+  }); };
+}
+function batchForm(pid, q){
+  const p = S.products[pid];
+  openModal(`<h2>Add expiry date · ${esc(p.name)}</h2><p class="muted" style="margin:0">Record the expiry date for stock already on the shelf. This does not change the stock quantity.</p>
+  <form id="bf" class="grid" style="gap:12px"><div class="fgrid">
+    <div class="field"><label for="bf-qty">Quantity</label><input type="number" step="any" min="0" max="${q}" id="bf-qty" value="${q}"></div>
+    <div class="field"><label for="bf-exp">Expiry date</label><input type="date" id="bf-exp" required></div>
+  </div><div class="mf"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn pri">Save</button></div></form>`);
+  $('#bf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const qty = Math.min(num($('#bf-qty').value), q), exp = $('#bf-exp').value; if(qty<=0||!exp){ toast('Enter a quantity and a date.', true); return; }
+    await add('batches', {pid, qty, expiry:exp, received:Date.now()}); closeModal(); toast('Expiry date recorded.');
+  }); };
+}
+function customerForm(id, fromSale=false){
+  const c = id ? S.customers[id] : {};
+  openModal(`<h2>${id?'Edit customer':'New credit customer'}</h2><form id="cf" class="grid" style="gap:12px"><div class="fgrid">
+    <div class="field"><label for="cf-name">Name</label><input type="text" id="cf-name" required value="${esc(c.name||'')}" placeholder="e.g. Mama Wanjiku"></div>
+    <div class="field"><label for="cf-phone">Phone</label><input type="tel" id="cf-phone" value="${esc(c.phone||'')}" placeholder="07xx xxx xxx"></div>
+    <div class="field"><label for="cf-limit">Credit limit (KES, 0 = none)</label><input type="number" min="0" id="cf-limit" value="${esc(c.limit??0)}"></div>
+  </div><div class="mf"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn pri">${id?'Save':'Add customer'}</button></div></form>`);
+  $('#cf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const name = $('#cf-name').value.trim(); if(!name){ toast('Enter the customer name.', true); return; }
+    const data = {name, phone:$('#cf-phone').value.trim(), limit:num($('#cf-limit').value)};
+    if(id) await upd('customers/'+id, data);
+    else { const ref = db.collection('customers').doc(); await retry(()=>ref.set({...data, id:ref.id, balance:0, created:Date.now()})); if(fromSale){ UI.saleCust = ref.id; UI.payMethod='credit'; } }
+    closeModal(); toast(id?'Customer saved.':'Customer added.'); schedule();
+  }); };
+}
+function paymentForm(id){
+  const c = S.customers[id];
+  openModal(`<h2>Record payment · ${esc(c.name)}</h2><p class="muted" style="margin:0">Currently owes <b>${kes(c.balance)}</b>.</p>
+  <form id="ppf" class="grid" style="gap:12px"><div class="fgrid">
+    <div class="field"><label for="pp-amt">Amount paid (KES)</label><input type="number" min="0" step="any" id="pp-amt" value="${Math.max(0,num(c.balance))||''}"></div>
+    <div class="field"><label for="pp-m">Paid by</label><select id="pp-m"><option value="cash">Cash</option><option value="mpesa">M-Pesa</option></select></div>
+    <div class="field"><label for="pp-ref">M-Pesa code / note</label><input type="text" id="pp-ref"></div>
+  </div><div class="mf"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn pri">Save payment</button></div></form>`);
+  $('#ppf').onsubmit = e => { e.preventDefault(); guarded(async()=>{
+    const a = num($('#pp-amt').value); if(a<=0){ toast('Enter an amount above zero.', true); return; }
+    const ts = Date.now();
+    await add('payments', {ts, date:ymd(ts), cid:id, cname:c.name, amount:a, method:$('#pp-m').value, ref:$('#pp-ref').value.trim(), by:S.me||null});
+    await upd('customers/'+id, {balance:+(num(c.balance)-a).toFixed(2), lastTs:ts, lastPayTs:ts});
+    closeModal(); toast(`Payment of ${kes(a)} recorded. ${c.name} now owes ${kes(num(c.balance)-a)}.`);
+  }); };
+}
+async function statement(id){
+  const c = S.customers[id];
+  openModal(`<h2>Statement · ${esc(c.name)}</h2><p class="muted">Loading…</p>`, true);
+  let sales=[], pays=[];
+  try{
+    const [a,b] = await Promise.all([ db.collection('sales').where('cid','==',id).limit(500).get(), db.collection('payments').where('cid','==',id).limit(500).get() ]);
+    sales = a.docs.map(d=>d.data()); pays = b.docs.map(d=>d.data());
+  }catch(e){ toast(errMsg(e), true); }
+  const rows = [...sales.map(s=>({ts:s.ts, d:'Credit sale: '+(s.items||[]).map(i=>i.name+' ×'+qtyf(i.qty)).join(', '), dr:num(s.total), cr:0})), ...pays.map(p=>({ts:p.ts, d:'Payment ('+(METHODS[p.method]||p.method)+(p.ref?' '+p.ref:'')+')', dr:0, cr:num(p.amount)}))].sort((a,b)=>a.ts-b.ts);
+  let bal = 0;
+  openModal(`<div class="ch row"><h2>Statement · ${esc(c.name)}</h2><span class="right muted">${esc(c.phone||'')}</span></div>
+  <div class="tw"><table><thead><tr><th>Date</th><th>Details</th><th class="n">Credit taken</th><th class="n">Paid</th><th class="n">Balance</th></tr></thead><tbody>
+  ${rows.length?rows.map(r=>{ bal += r.dr - r.cr; return `<tr><td style="white-space:nowrap">${fmtDT(r.ts)}</td><td>${esc(r.d)}</td><td class="n">${r.dr?kes2(r.dr):''}</td><td class="n">${r.cr?kes2(r.cr):''}</td><td class="n"><b>${kes2(bal)}</b></td></tr>`; }).join(''):'<tr><td colspan="5"><p class="empty">No transactions yet.</p></td></tr>'}
+  </tbody></table></div><p style="margin:0">Current balance: <b>${kes(c.balance)}</b></p>
+  <div class="mf"><button class="btn" data-act="copy-statement" data-id="${id}">Copy as text</button><button class="btn pri" data-act="close">Close</button></div>`, true);
+  UI._stmt = `${S.settings.shopName} — statement for ${c.name}\n` + rows.map(r=>`${ymd(r.ts)}  ${r.d}  ${r.dr?'+'+kes2(r.dr):'-'+kes2(r.cr)}`).join('\n') + `\nBalance owed: ${kes(c.balance)}`;
+}
+
+/* ---------------- CSV / export ---------------- */
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true; else if(ch===','){ row.push(cur); cur=''; } else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; } else cur+=ch; }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+const csvCell = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+const toCSV = rows => rows.map(r=>r.map(csvCell).join(',')).join('\n');
+async function importCSV(file){
+  const rows = parseCSV(await file.text()); if(rows.length<2){ toast('That file has no product rows.', true); return; }
+  const hdr = rows[0].map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,''));
+  const col = n => hdr.indexOf(n.toLowerCase());
+  if(col('name')<0){ toast('The CSV needs a "name" column. See Settings for the format.', true); return; }
+  const get = (r,n) => { const i=col(n); return i<0 ? undefined : (r[i]??'').trim(); };
+  let added=0, updated=0;
+  for(const r of rows.slice(1)){
+    const name = get(r,'name'); if(!name) continue;
+    const sku = get(r,'sku')||get(r,'barcode')||'';
+    const data = {name};
+    [['category','category'],['unit','unit'],['supplier','supplier']].forEach(([k,c])=>{ const v=get(r,c); if(v!==undefined) data[k]=v; });
+    [['cost','cost'],['price','price'],['reorder','reorder'],['leadDays','leaddays']].forEach(([k,c])=>{ const v=get(r,c); if(v!==undefined && v!=='') data[k]=num(v); });
+    const te = get(r,'tracksexpiry'); if(te!==undefined) data.tracksExpiry = /^(y|yes|true|1)$/i.test(te);
+    const ex = (sku && Object.values(S.products).find(p=>p.sku===sku)) || Object.values(S.products).find(p=>p.name.toLowerCase()===name.toLowerCase());
+    const st = get(r,'stock');
+    if(ex){ if(st!==undefined && st!=='') data.stock = num(st); await upd('products/'+ex.id, {...data, sku:sku||ex.sku||''}); updated++; }
+    else { const ref = db.collection('products').doc(); await retry(()=>ref.set({unit:'pcs',category:'',supplier:'',cost:0,price:0,reorder:5,leadDays:2,tracksExpiry:false, ...data, sku, id:ref.id, stock:num(st), created:Date.now(), archived:false})); added++; }
+  }
+  toast(`Import done: ${added} added, ${updated} updated.`);
+}
+async function offerFile(filename, data){
+  try{ const type = filename.endsWith('.json')?'application/json':'text/csv';
+    const url = URL.createObjectURL(new Blob(['\ufeff'+data],{type:type+';charset=utf-8'}));
+    const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000); return; }catch(e){}
+  try{ await navigator.clipboard.writeText(data); toast('Downloads aren\'t available here, so the data was copied. Paste it into Excel or a text file.'); }
+  catch(e){ toast('Could not export from this view.', true); }
+}
+async function copyText(t, msg='Copied.'){ try{ await navigator.clipboard.writeText(t); toast(msg); }catch(e){ toast('Copy was blocked. Select the text and copy it manually.', true); } }
+
+async function archiveOld(){
+  const days = Math.max(60, num($('#set-arch')?.value || S.settings.archiveDays));
+  const cutoff = startOfDay(ymd(Date.now()-days*DAY));
+  const [ss, rr, aa] = await Promise.all([
+    db.collection('sales').where('ts','<',cutoff).limit(500).get(),
+    db.collection('receipts').where('ts','<',cutoff).limit(500).get(),
+    db.collection('adjustments').where('ts','<',cutoff).limit(500).get() ]);
+  const n = ss.size+rr.size+aa.size;
+  if(!n){ toast(`Nothing older than ${days} days to archive.`); return; }
+  if(!(await confirmBox('Archive old records?', `${ss.size} sales, ${rr.size} deliveries and ${aa.size} adjustments older than ${days} days will be rolled into monthly totals and removed. Credit statements keep working from customer balances.`, 'Archive'))) return;
+  const months = {};
+  const mk = t => ymd(t).slice(0,7);
+  ss.docs.forEach(d=>{ const s=d.data(); const m=months[mk(s.ts)] ||= {revenue:0,cost:0,count:0,losses:0,received:0}; m.revenue+=num(s.total); m.cost+=num(s.costTotal); m.count++; });
+  rr.docs.forEach(d=>{ const r=d.data(); const m=months[mk(r.ts)] ||= {revenue:0,cost:0,count:0,losses:0,received:0}; m.received+=num(r.total); });
+  aa.docs.forEach(d=>{ const a=d.data(); const m=months[mk(a.ts)] ||= {revenue:0,cost:0,count:0,losses:0,received:0}; if(num(a.value)<0) m.losses+=-num(a.value); });
+  for(const [k,m] of Object.entries(months)){
+    const ex = S.summaries[k] || {revenue:0,cost:0,count:0,losses:0,received:0};
+    await retry(()=>db.doc('summaries/'+k).set({month:k, revenue:num(ex.revenue)+m.revenue, cost:num(ex.cost)+m.cost, count:num(ex.count)+m.count, losses:num(ex.losses)+m.losses, received:num(ex.received)+m.received}));
+  }
+  for(const d of [...ss.docs.map(x=>'sales/'+x.id), ...rr.docs.map(x=>'receipts/'+x.id), ...aa.docs.map(x=>'adjustments/'+x.id)]) await retry(()=>db.doc(d).delete());
+  if(days!==num(S.settings.archiveDays)) await saveSettings({archiveDays:days});
+  toast(`Archived ${n} records into ${Object.keys(months).length} monthly totals.`);
+}
+async function saveSettings(patch){ const ref = db.doc('settings/main'); await retry(()=>ref.set({...S.settings, ...patch})); }
+
+async function clearSample(){
+  if(!(await confirmBox('Clear example data?', 'This removes the example products, batches, customers, sales, deliveries and adjustments. Anything you added yourself stays.', 'Clear example data', true))) return;
+  const cols = ['products','batches','customers','sales','receipts','adjustments','payments','stocktakes'];
+  let n = 0;
+  for(const c of cols){ const snap = await db.collection(c).where('sample','==',true).limit(1000).get(); for(const d of snap.docs){ await retry(()=>db.doc(c+'/'+d.id).delete()); n++; } }
+  toast(`Removed ${n} example records.`);
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if(!t) return;
+  const a = t.dataset.act, id = t.dataset.id;
+  if(a==='scrim'){ if(e.target===t) closeModal(); return; }
+  if(a==='close'){ closeModal(); return; }
+  if(t.tagName==='A' && a==='filter-low'){ UI.prodStatus='attention'; return; }
+  e.preventDefault();
+  switch(a){
+    case 'add-item': addToBasket(id); break;
+    case 'rm-item': UI.basket.splice(+t.dataset.i,1); schedule(); break;
+    case 'clear-basket': UI.basket=[]; schedule(); break;
+    case 'pay': UI.payMethod=t.dataset.m; schedule(); break;
+    case 'complete-sale': guarded(completeSale); break;
+    case 'new-sale': UI.lastSale=null; schedule(); setTimeout(()=>$('#sale-search')?.focus(),40); break;
+    case 'copy-receipt': copyText($('#receipt-text').textContent, 'Receipt copied. Paste it into SMS or WhatsApp.'); break;
+    case 'new-cust': customerForm(null, UI.view==='sell'); break;
+    case 'edit-cust': customerForm(id); break;
+    case 'pay-debt': paymentForm(id); break;
+    case 'statement': statement(id); break;
+    case 'copy-statement': copyText(UI._stmt||'', 'Statement copied.'); break;
+    case 'edit-product': productForm(id); break;
+    case 'adjust': adjustForm(id); break;
+    case 'writeoff': writeOffForm(id); break;
+    case 'add-batch': batchForm(id, num(t.dataset.q)); break;
+    case 'import-csv': $('#csv-file').click(); break;
+    case 'export-products': { const an = analyse(); offerFile(`products-${today()}.csv`, toCSV([['name','sku','category','unit','cost','price','stock','reorder','leadDays','supplier','tracksExpiry','status','soldLast30Days','stockValue'], ...an.map(p=>[p.name,p.sku,p.category,p.unit,p.cost,p.price,p.stock,p.reorder,p.leadDays,p.supplier,p.tracksExpiry?'yes':'no',p.status,p.sold30,p.value])])); break; }
+    case 'si-add': { const p=S.products[id]; if(!UI.stockIn.lines.find(l=>l.pid===id)) UI.stockIn.lines.push({pid:id, name:p.name, qty:'', cost:p.cost||'', expiry:''}); UI.siSearch=''; const s=$('#si-search'); if(s) s.value=''; schedule(); setTimeout(()=>{ const i=UI.stockIn.lines.findIndex(l=>l.pid===id); $('#sil-q-'+i)?.focus(); },40); break; }
+    case 'si-rm': UI.stockIn.lines.splice(+t.dataset.i,1); schedule(); break;
+    case 'si-clear': UI.stockIn.lines=[]; schedule(); break;
+    case 'si-save': guarded(saveStockIn); break;
+    case 'count-fill': { const q=UI.countSearch.toLowerCase(); activeProducts().filter(p=>(!UI.countCat||p.category===UI.countCat)&&(!q||p.name.toLowerCase().includes(q))).forEach(p=>{ if(UI.count[p.id]===undefined||UI.count[p.id]==='') UI.count[p.id]=String(num(p.stock)); }); document.querySelectorAll('[data-cnt]').forEach(el=>el.value=UI.count[el.dataset.cnt]??''); schedule(); break; }
+    case 'count-clear': UI.count={}; document.querySelectorAll('[data-cnt]').forEach(el=>el.value=''); schedule(); break;
+    case 'count-post': guarded(postCount); break;
+    case 'rep-quick': { const v=t.dataset.a; UI.rep.to=today(); UI.rep.from = v==='m' ? today().slice(0,8)+'01' : ymd(Date.now()-num(v)*DAY); const f=$('#rep-from'), to=$('#rep-to'); if(f) f.value=UI.rep.from; if(to) to.value=UI.rep.to; loadReport(); break; }
+    case 'rep-run': UI.rep.from=$('#rep-from').value||UI.rep.from; UI.rep.to=$('#rep-to').value||UI.rep.to; loadReport(); break;
+    case 'export-report': { const c=reportCalc(); offerFile(`sales-report-${UI.rep.from}-to-${UI.rep.to}.csv`, toCSV([['Product','Category','Qty sold','Sales (KES)','Cost (KES)','Profit (KES)'], ...c.byP.map(p=>[p.name,p.cat,p.qty,p.rev.toFixed(2),p.cost.toFixed(2),(p.rev-p.cost).toFixed(2)]), [], ['Total','',sum(c.byP,p=>p.qty),c.rev.toFixed(2),c.cost.toFixed(2),c.gp.toFixed(2)]])); break; }
+    case 'save-settings': guarded(async()=>{ await saveSettings({shopName:$('#set-name').value.trim()||'My Duka', expiryWarnDays:Math.max(1,num($('#set-exp').value)), deadDays:Math.max(1,num($('#set-dead').value)), coverDays:Math.max(1,num($('#set-cover').value))}); toast('Settings saved.'); }); break;
+    case 'export-all': offerFile(`duka-backup-${today()}.json`, JSON.stringify({exported:new Date().toISOString(), settings:S.settings, products:Object.values(S.products), batches:Object.values(S.batches), customers:Object.values(S.customers), sales:S.sales, receipts:S.receipts, adjustments:S.adjustments, payments:S.payments, stocktakes:S.stocktakes, summaries:S.summaries}, null, 1)); break;
+    case 'archive': guarded(archiveOld); break;
+    case 'clear-sample': guarded(clearSample); break;
+    case 'load-sample': guarded(async()=>{ if(!(await confirmBox('Load example data?','Adds 18 example products, 3 customers and two weeks of sales, all marked as examples so you can clear them later.','Load example data'))) return; await loadSampleInto(db); toast('Example data loaded.'); }); break;
+    case 'sign-out': FB && FB.signOut(FB.auth).then(()=>location.reload()); break;
+    case 'add-staff': guarded(async()=>{ const em = $('#staff-email').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Enter a valid Google email address.', true); return; } await db.doc('staff/'+em).set({role:'staff', name:$('#staff-name').value.trim(), added:Date.now(), addedBy:S.email}); $('#staff-email').value=''; $('#staff-name').value=''; toast(em+' can now sign in.'); }); break;
+    case 'rm-staff': guarded(async()=>{ if(!(await confirmBox('Remove staff member?', esc(id)+' will lose access straight away.', 'Remove', true))) return; await db.doc('staff/'+id).delete(); toast('Access removed.'); }); break;
+    case 'copy-template': copyText('name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry\nSugar 1kg,6161100410013,Groceries,pkt,145,165,40,15,3,Mumias Dist.,no\n', 'Template copied. Paste into Excel and save as CSV.'); break;
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if(t.id==='sale-search'){ UI.saleSearch=t.value; schedule(); return; }
+  if(t.id==='si-search'){ UI.siSearch=t.value; schedule(); return; }
+  if(t.dataset.bq!==undefined){ const l=UI.basket[+t.dataset.bq]; if(l){ l.qty=t.value; const row=t.closest('tr'); row.children[2].textContent=kes2(num(l.qty)*num(l.price)); $('#sale-total').textContent=kes(basketTotal()); const btn=$('[data-act=complete-sale]'); if(btn) btn.textContent='Complete sale · '+kes(basketTotal()); } return; }
+  if(t.id==='tendered'){ UI.tendered=t.value; const c=num(t.value)-basketTotal(); $('#change-line').innerHTML = t.value?(c>=0?'Change: <b>'+kes(c)+'</b>':'Short by '+kes(-c)):''; return; }
+  if(t.id==='sale-ref'){ UI.saleRef=t.value; return; }
+  if(t.dataset.sil!==undefined){ const l=UI.stockIn.lines[+t.dataset.sil]; if(l){ l[t.dataset.f]=t.value; $('#sil-t-'+t.dataset.sil).textContent=kes2(num(l.qty)*num(l.cost)); $('#si-total').textContent=kes(sum(UI.stockIn.lines,x=>num(x.qty)*num(x.cost))); } return; }
+  if(['si-supplier','si-invoice','si-date'].includes(t.id)){ UI.stockIn[t.id.slice(3)] = t.value; return; }
+  if(t.dataset.cnt!==undefined){ UI.count[t.dataset.cnt]=t.value; updateCountRow(t.dataset.cnt); return; }
+  if(t.id==='prod-search'){ UI.prodSearch=t.value; schedule(); return; }
+  if(t.id==='count-search'){ UI.countSearch=t.value; schedule(); return; }
+  if(t.id==='cust-search'){ UI.custSearch=t.value; schedule(); return; }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if(t.id==='prod-cat'){ UI.prodCat=t.value; schedule(); }
+  if(t.id==='prod-status'){ UI.prodStatus=t.value; schedule(); }
+  if(t.id==='count-cat'){ UI.countCat=t.value; schedule(); }
+  if(t.id==='hist-type'){ UI.histType=t.value; schedule(); }
+  if(t.id==='sale-cust'){ UI.saleCust=t.value; schedule(); }
+  if(t.id==='csv-file' && t.files[0]){ const f=t.files[0]; t.value=''; guarded(()=>importCSV(f)); }
+});
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape' && $('#modal-root').innerHTML){ closeModal(); return; }
+  if(e.key==='Enter' && (e.target.id==='sale-search' || e.target.id==='si-search')){
+    e.preventDefault(); const m = findProducts(e.target.value); if(!m.length) return;
+    if(e.target.id==='sale-search') addToBasket(m[0].id);
+    else { const p = m[0]; if(!UI.stockIn.lines.find(l=>l.pid===p.id)) UI.stockIn.lines.push({pid:p.id, name:p.name, qty:'', cost:p.cost||'', expiry:''}); UI.siSearch=''; e.target.value=''; schedule(); setTimeout(()=>{ const i=UI.stockIn.lines.findIndex(l=>l.pid===p.id); $('#sil-q-'+i)?.focus(); },40); }
+  }
+});
+function updateCountRow(id){
+  const p = S.products[id]; const v = UI.count[id]; const has = v!=='' && v!==undefined; const d = has?num(v)-num(p.stock):0;
+  const cd = $('#cd-'+id), cv = $('#cv-'+id);
+  if(cd){ cd.textContent = has?(d>0?'+':'')+qtyf(d):''; cd.style.color = d<0?'var(--bad)':d>0?'var(--ok)':''; }
+  if(cv) cv.textContent = has&&d?kes(d*num(p.cost)):'';
+  const counted = Object.entries(UI.count).filter(([i,x])=>x!==''&&S.products[i]);
+  const vars = counted.map(([i,x])=>{ const pp=S.products[i]; const dd=num(x)-num(pp.stock); return dd*num(pp.cost); }).filter((x,i)=>num(counted[i][1])!==num(S.products[counted[i][0]].stock));
+  $('#st-counted').textContent = `${counted.length} / ${activeProducts().length}`; $('#st-var').textContent = vars.length; $('#st-val').textContent = kes(sum(vars));
+  const btn = $('[data-act=count-post]'); if(btn) btn.disabled = !counted.length || !S.canWrite;
+}
+function route(){
+  const h = location.hash.replace('#','');
+  UI.view = VIEWS.some(v=>v[0]===h) ? h : 'dashboard';
+  if(UI.view==='reports') UI.rep.data = UI.rep.data; // keep last report
+  closeModal(); render(); $('#main').scrollTop = 0;
+}
+window.addEventListener('hashchange', route);
+
+/* ---------------- example data (demo mode only; the live shop is seeded once by Claude, marked sample:true) ---------------- */
+function makeSample(now){
+  let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  const P = [
+    ['Sugar 1kg','DK-001','Groceries','pkt',145,165,22,15,3,'Mumias Distributors',false,6],
+    ['Maize flour 2kg','DK-002','Groceries','pkt',128,145,9,12,2,'Unga Wholesalers',false,7],
+    ['Cooking oil 1L','DK-003','Groceries','bottle',290,330,14,6,3,'Unga Wholesalers',false,2.5],
+    ['Rice Pishori 1kg','DK-004','Groceries','pkt',170,200,18,8,3,'Unga Wholesalers',false,2],
+    ['Fresh milk 500ml','DK-005','Dairy','pkt',52,60,34,20,1,'Dairy route van',true,14],
+    ['White bread 400g','DK-006','Bakery','loaf',58,65,11,10,1,'Bakery route van',true,9],
+    ['Yoghurt 250ml','DK-007','Dairy','cup',45,55,20,8,2,'Dairy route van',true,3],
+    ['Eggs','DK-008','Groceries','pcs',14,18,0,30,1,'Local farmer',false,12],
+    ['Coffee 500g','DK-009','Groceries','tin',230,265,7,4,5,'Mumias Distributors',false,0.6],
+    ['Tea leaves 250g','DK-010','Groceries','pkt',115,140,16,6,5,'Mumias Distributors',false,1.5],
+    ['Washing powder 500g','DK-011','Household','pkt',150,175,12,6,5,'Household Supplies Ltd',false,1.4],
+    ['Bar soap 800g','DK-012','Household','bar',95,115,19,8,5,'Household Supplies Ltd',false,2],
+    ['Toilet paper single','DK-013','Household','roll',30,40,40,20,5,'Household Supplies Ltd',false,4],
+    ['Soda 500ml','DK-014','Drinks','bottle',55,70,26,24,2,'Drinks distributor',false,8],
+    ['Salt 1kg','DK-015','Groceries','pkt',28,35,25,6,5,'Mumias Distributors',false,1],
+    ['Margarine 250g','DK-016','Groceries','tub',120,140,5,6,3,'Mumias Distributors',false,1.6],
+    ['Petroleum jelly 250ml','DK-017','Personal care','jar',140,170,9,3,7,'Household Supplies Ltd',false,0],
+    ['Matchbox (10 pack)','DK-018','Household','pkt',25,30,12,4,7,'Household Supplies Ltd',false,0.4]
+  ];
+  const day = t => { const d=new Date(t); d.setHours(0,0,0,0); return d.getTime(); };
+  const t0 = day(now); const plus = n => ymd(t0+n*DAY);
+  const products = P.map(([name,sku,category,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry,rate],i)=>({id:'ex-p'+(i+1), name, sku, category, unit, cost, price, stock, reorder, leadDays, supplier, tracksExpiry, rate, created:now-60*DAY, archived:false, sample:true}));
+  const customers = [['ex-c1','Mama Wanjiku','0712 345 678',3000],['ex-c2','Otieno (boda)','0722 456 789',1500],['ex-c3','Shiro Salon','0733 567 890',5000]].map(([id,name,phone,limit])=>({id,name,phone,limit,balance:0,created:now-50*DAY,sample:true}));
+  const sales = []; const lastSold = {};
+  const weighted = products.filter(p=>p.rate>0);
+  const totalRate = sum(weighted,p=>p.rate);
+  const pick = () => { let r = rnd()*totalRate; for(const p of weighted){ r-=p.rate; if(r<=0) return p; } return weighted[0]; };
+  for(let d=13; d>=0; d--){
+    const n = d===0 ? 5 : 4 + Math.floor(rnd()*4);
+    for(let k=0;k<n;k++){
+      const ts = t0 - d*DAY + (8+Math.floor(rnd()*12))*3600000 + Math.floor(rnd()*3600000);
+      if(ts>now) continue;
+      const items = {}; const lines = 1+Math.floor(rnd()*3);
+      for(let j=0;j<lines;j++){ const p = pick(); const q = p.unit==='pcs'? 2+Math.floor(rnd()*6) : 1+Math.floor(rnd()*2); items[p.id] = items[p.id] || {pid:p.id,name:p.name,qty:0,price:p.price,cost:p.cost}; items[p.id].qty += q; lastSold[p.id]=Math.max(lastSold[p.id]||0,ts); }
+      const its = Object.values(items); const r = rnd();
+      const method = r<0.5?'cash':r<0.88?'mpesa':'credit';
+      const s = {id:'ex-s'+(sales.length+1), ts, date:ymd(ts), items:its, total:sum(its,i=>i.qty*i.price), costTotal:sum(its,i=>i.qty*i.cost), method, by:null, sample:true};
+      if(method==='credit'){ const c = customers[Math.floor(rnd()*customers.length)]; s.cid=c.id; s.cname=c.name; c.balance+=s.total; c.lastTs=Math.max(c.lastTs||0,ts); }
+      if(method==='mpesa') s.ref = 'S'+Math.floor(rnd()*36**8).toString(36).toUpperCase().padStart(9,'X');
+      sales.push(s);
+    }
+  }
+  products.forEach(p=>{ if(lastSold[p.id]) p.lastSold = lastSold[p.id]; delete p.rate; });
+  const payments = [];
+  const c1 = customers[0];
+  if(c1.balance>0){ const amt = Math.round(c1.balance*0.4); const ts = t0-2*DAY+15*3600000; payments.push({id:'ex-pay1', ts, date:ymd(ts), cid:c1.id, cname:c1.name, amount:amt, method:'mpesa', ref:'SKX81LMQ2A', by:null, sample:true}); c1.balance-=amt; c1.lastPayTs=ts; }
+  const batches = [
+    ['ex-b1','ex-p5',10,plus(2)],['ex-b2','ex-p5',24,plus(6)],
+    ['ex-b3','ex-p6',3,plus(-1)],['ex-b4','ex-p6',8,plus(3)],
+    ['ex-b5','ex-p7',8,plus(12)],['ex-b6','ex-p7',12,plus(26)]
+  ].map(([id,pid,qty,expiry])=>({id,pid,qty,expiry,received:t0-3*DAY,sample:true}));
+  const rcv = (id,dAgo,supplier,invoice,lines) => { const ts=t0-dAgo*DAY+9*3600000; const items=lines.map(([pid,qty,expiry])=>{const p=products.find(x=>x.id===pid); return {pid,name:p.name,qty,cost:p.cost,expiry:expiry||null};}); return {id, ts, date:ymd(ts), supplier, invoice, items, total:sum(items,i=>i.qty*i.cost), by:null, sample:true}; };
+  const receipts = [ rcv('ex-r1',1,'Dairy route van','DV-2231',[['ex-p5',24,plus(6)],['ex-p7',12,plus(26)]]), rcv('ex-r2',4,'Unga Wholesalers','UW-10457',[['ex-p2',20],['ex-p3',12],['ex-p4',10]]) ];
+  const adjustments = [ (()=>{ const ts=t0-3*DAY+18*3600000; return {id:'ex-a1', ts, date:ymd(ts), pid:'ex-p6', name:'White bread 400g', qty:-2, reason:'damage', value:-116, note:'Squashed in delivery crate', by:null, sample:true}; })() ];
+  return {products, customers, sales, payments, batches, receipts, adjustments};
+}
+async function loadSampleInto(store){
+  const s = makeSample(Date.now());
+  for(const [col, arr] of Object.entries(s)) for(const d of arr) await store.doc(col+'/'+d.id).set(d);
+}
+
+/* ---------------- data wiring ---------------- */
+function subscribe(){
+  const since = Date.now()-35*DAY;
+  let loadTimer = setTimeout(()=>{ if(S.status!=='live'){ S.status='off'; schedule(); } }, 10000);
+  const pend = {};
+  const live = (snap, key) => {
+    if(!snap || !snap.metadata) return;
+    if(key){ pend[key] = snap.metadata.hasPendingWrites; S.pending = Object.values(pend).some(Boolean); }
+    if(!snap.metadata.fromCache){ if(S.status!=='live'){ S.status='live'; clearTimeout(loadTimer); } }
+    else if(S.status==='live' && S.mode==='live' && !navigator.onLine){ S.status='off'; }
+  };
+  window.addEventListener('online', ()=>{ if(S.status==='off') { S.status='wait'; schedule(); } });
+  window.addEventListener('offline', ()=>{ S.status='off'; schedule(); });
+  const onErr = e => { console.warn(e); if(e && e.code==='permission-denied' && S.mode==='live'){ showNotApproved(S.email); return; } S.status = S.status==='live'?'live':'off'; clearTimeout(loadTimer); schedule(); };
+  const toMap = snap => { const m={}; snap.docs.forEach(d=>{ m[d.id] = {id:d.id, ...d.data()}; }); return m; };
+  const toArr = snap => snap.docs.map(d=>({id:d.id, ...d.data()}));
+  db.collection('products').onSnapshot(s=>{ S.products = toMap(s); S.loadedProducts = true; live(s,'p'); schedule(); }, onErr);
+  db.collection('batches').where('qty','>',0).onSnapshot(s=>{ S.batches = toMap(s); live(s,'b'); schedule(); }, onErr);
+  db.collection('customers').onSnapshot(s=>{ S.customers = toMap(s); live(s,'c'); schedule(); }, onErr);
+  db.collection('sales').where('ts','>=',since).orderBy('ts','desc').limit(1000).onSnapshot(s=>{ S.sales = toArr(s); live(s,'s'); schedule(); }, onErr);
+  db.collection('receipts').orderBy('ts','desc').limit(300).onSnapshot(s=>{ S.receipts = toArr(s); live(s,'r'); schedule(); }, onErr);
+  db.collection('adjustments').orderBy('ts','desc').limit(300).onSnapshot(s=>{ S.adjustments = toArr(s); live(s,'a'); schedule(); }, onErr);
+  db.collection('payments').orderBy('ts','desc').limit(300).onSnapshot(s=>{ S.payments = toArr(s); live(s,'pay'); schedule(); }, onErr);
+  db.collection('stocktakes').orderBy('ts','desc').limit(20).onSnapshot(s=>{ S.stocktakes = toArr(s); live(s); schedule(); }, onErr);
+  db.collection('summaries').onSnapshot(s=>{ S.summaries = toMap(s); live(s); schedule(); }, onErr);
+  if(S.mode==='live') db.collection('staff').onSnapshot(s=>{ S.staff = toMap(s); schedule(); }, e=>console.warn(e));
+  db.doc('settings/main').onSnapshot(s=>{ S.settings = {...DEFAULT_SETTINGS, ...(s.exists?s.data():{})}; live(s); schedule(); }, onErr);
+}
+/* ---------------- Firebase ---------------- */
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+let FB = null;
+function FireDB(F, fs){
+  // Same small API the app uses everywhere (doc / collection / where / orderBy / limit / get / onSnapshot / set / update / delete / add).
+  // Writes are applied to the local cache immediately and synced in the background, so the till keeps working offline.
+  const bg = p => { p.catch(e=>{ console.error(e); toast(errMsg(e), true); }); return Promise.resolve(); };
+  const wDoc = x => ({ id:x.id, exists:x.exists(), data:()=>x.data(), metadata:x.metadata });
+  const wQ = q => ({ docs:q.docs.map(wDoc), size:q.size, empty:q.empty, metadata:q.metadata });
+  const opts = { includeMetadataChanges:true };
+  const docRef = path => { const r = F.doc(fs, path); return { id:r.id, path:r.path,
+    get: async()=>wDoc(await F.getDoc(r)),
+    set: d=>bg(F.setDoc(r, d)), update: d=>bg(F.updateDoc(r, d)), delete: ()=>bg(F.deleteDoc(r)),
+    onSnapshot: (n,e)=>F.onSnapshot(r, opts, x=>n(wDoc(x)), e),
+    collection: c=>coll(r.path+'/'+c) }; };
+  const query = (cp, cons=[]) => { const q = () => F.query(F.collection(fs, cp), ...cons); return {
+    where:(f,op,v)=>query(cp,[...cons,F.where(f,op,v)]), orderBy:(f,d)=>query(cp,[...cons,F.orderBy(f,d||'asc')]), limit:n=>query(cp,[...cons,F.limit(n)]),
+    get: async()=>wQ(await F.getDocs(q())), onSnapshot:(n,e)=>F.onSnapshot(q(), opts, x=>n(wQ(x)), e) }; };
+  const coll = p => Object.assign(query(p), { path:p,
+    doc: id => id ? docRef(p+'/'+id) : docRef(F.doc(F.collection(fs, p)).path),
+    add: async d => { const r = docRef(F.doc(F.collection(fs, p)).path); await r.set(d); return r; } });
+  return { doc:docRef, collection:coll };
+}
+function gate(inner){ document.body.innerHTML = `<div class="gate"><div class="box">${inner}</div></div><div id="modal-root"></div>`; }
+const GLOGO = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+function showSignIn(msg){
+  gate(`<h1>Duka Stock Manager</h1><p>Sign in with the Google account your shop owner approved.</p>${msg?`<div class="banner bad" style="margin:0">${esc(msg)}</div>`:''}<button class="gbtn" id="g-in">${GLOGO} Sign in with Google</button>`);
+  $('#g-in').onclick = async () => {
+    const prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({prompt:'select_account'});
+    try{ await FB.signInWithPopup(FB.auth, prov); }
+    catch(e){ if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/cancelled-popup-request'].includes(e.code)) FB.signInWithRedirect(FB.auth, prov); else if(e.code==='auth/unauthorized-domain') showSignIn('This site address is not allowed to sign in yet. In Firebase console › Authentication › Settings › Authorized domains, add '+location.hostname+'.'); else if(e.code!=='auth/popup-closed-by-user') showSignIn('Sign-in failed: '+(e.message||e.code)); }
+  };
+}
+function showNotApproved(email){
+  gate(`<h1>Not approved yet</h1><p>You're signed in as <b>${esc(email)}</b>, but this email isn't on the shop's staff list.</p><p>Ask the owner to add it under <b>Settings › Staff</b>, then reload this page.</p><div class="row"><button class="btn" onclick="location.reload()">Reload</button><button class="btn" id="g-out">Use another account</button></div>`);
+  $('#g-out').onclick = () => FB.signOut(FB.auth).then(()=>location.reload());
+}
+function showSetup(){
+  gate(`<h1>Almost there</h1><p>Firebase isn't configured yet. Open <code>firebase-config.js</code> in your GitHub repo, paste your Firebase web app config, and commit (see README.md in the repo).</p><a class="btn pri" href="?demo">Try the demo instead</a>`);
+}
+async function startApp(store, mode){
+  db = store; S.mode = mode; if(mode==='memory'){ S.status='live'; }
+  route(); subscribe(); schedule();
+}
+async function boot(){
+  if(new URLSearchParams(location.search).has('demo')){ const m = MemDB(); await loadSampleInto(m); S.role='owner'; return startApp(m, 'memory'); }
+  const cfg = window.FIREBASE_CONFIG;
+  if(!cfg || !cfg.apiKey || String(cfg.apiKey).startsWith('PASTE')) return showSetup();
+  const [A, Au, F] = await Promise.all([import(SDK+'firebase-app.js'), import(SDK+'firebase-auth.js'), import(SDK+'firebase-firestore.js')]);
+  const app = A.initializeApp(cfg);
+  let fs;
+  try{ fs = F.initializeFirestore(app, { ignoreUndefinedProperties:true, localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+  catch(e){ console.warn('Offline cache unavailable', e); fs = F.getFirestore(app); }
+  const auth = Au.getAuth(app);
+  FB = { auth, ...Au };
+  Au.getRedirectResult(auth).catch(e=>console.warn(e));
+  let started = false;
+  Au.onAuthStateChanged(auth, async u => {
+    if(!u){ if(started) location.reload(); else showSignIn(); return; }
+    if(started) return;
+    const email = (u.email||'').toLowerCase();
+    const store = FireDB(F, fs);
+    // Access check: approved staff have a staff/<email> document. The owner (named in firestore.rules) creates their own on first sign-in.
+    let me = null;
+    try{
+      const sd = await store.doc('staff/'+email).get();
+      if(sd.exists) me = sd.data();
+      else { await F.setDoc(F.doc(fs, 'staff/'+email), {role:'owner', name:u.displayName||'', added:Date.now()}); me = {role:'owner'}; }
+    }catch(e){
+      if(e && e.code==='permission-denied') return showNotApproved(email);
+      if(e && e.code==='unavailable'){ me = {role:'staff'}; } // offline on first load: open from the device cache
+      else return showSignIn('Could not check your access: '+(e.message||e.code));
+    }
+    started = true;
+    S.me = email; S.email = email; S.role = me.role || 'staff';
+    document.body.innerHTML = `<div class="app"><nav class="rail" id="rail" aria-label="Sections"></nav><main id="main"><p class="muted">Loading your shop…</p></main></div><div id="modal-root"></div>`;
+    startApp(store, 'live');
+  });
+}
+boot();
+</script>
+</body>
+</html>

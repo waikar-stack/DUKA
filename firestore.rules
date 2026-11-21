@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Who can use the shop:
+//  - the OWNER below (change it to your Google email, all lowercase), and
+//  - anyone the owner adds under Settings > Staff (stored as staff/<email>).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function owner() { return 'owner@gmail.com'; }   // <-- CHANGE THIS
+
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function email()    { return request.auth.token.email.lower(); }
+    function isOwner()  { return signedIn() && email() == owner(); }
+    function isStaff()  { return signedIn() && exists(/databases/$(database)/documents/staff/$(email())); }
+
+    // Staff list: everyone on it can read it; only the owner can change it.
+    match /staff/{member} {
+      allow read: if isOwner() || isStaff();
+      allow write: if isOwner();
+    }
+
+    // Shop data: products, sales, batches, customers, payments, settings...
+    match /{col}/{id} {
+      allow read, write: if col != 'staff' && (isOwner() || isStaff());
+    }
+  }
+}
