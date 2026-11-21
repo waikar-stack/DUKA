@@ -6,7 +6,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function owner() { return 'owner@gmail.com'; }   // <-- CHANGE THIS
+    function owner() { return 'waihenya.prince@gmail.com'; }   // <-- CHANGE THIS
 
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function email()    { return request.auth.token.email.lower(); }
