@@ -795,8 +795,8 @@ RENDER['shop-settings'] = () => {
         <div class="li"><div class="l"><b>Example data</b><span>Load example products, customers and sales to explore, or remove them.</span></div><div class="r row"><button class="btn sm" data-act="load-sample" ${S.role==='owner'?'':'disabled'}>Load</button><button class="btn sm danger" data-act="clear-sample" ${dis()}>Clear</button></div></div>
       </div>
     </div>
-    ${S.role==='owner'?`<div class="card"><h2 style="margin-bottom:4px">Staff</h2><p class="small muted" style="margin:0 0 12px">People who can sign in with Google and use this shop. Only the owner can change this list.</p>
-      <div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><input type="text" id="staff-email" placeholder="name@gmail.com" aria-label="Staff Google email"><input type="text" id="staff-name" placeholder="Name (optional)" aria-label="Staff name" style="max-width:160px"><button class="btn pri" data-act="add-staff">Add</button></div>
+    ${S.role==='owner'?`<div class="card"><h2 style="margin-bottom:4px">Staff</h2><p class="small muted" style="margin:0 0 12px">People who can use this shop. For each person, create a login in Firebase console › Authentication › Users › Add user, then add the same email here. Only the owner can change this list.</p>
+      <div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><input type="text" id="staff-email" placeholder="name@example.com" aria-label="Staff email"><input type="text" id="staff-name" placeholder="Name (optional)" aria-label="Staff name" style="max-width:160px"><button class="btn pri" data-act="add-staff">Add</button></div>
       <div class="list">${Object.values(S.staff).sort((a,b)=>(a.role==='owner'?-1:1)-(b.role==='owner'?-1:1)||a.id.localeCompare(b.id)).map(m=>`<div class="li"><div class="l"><b>${esc(m.name||m.id.split('@')[0])}</b><span>${esc(m.id)}</span></div><div class="r">${m.role==='owner'?'<span class="pill acc">Owner</span>':`<button class="btn sm danger" data-act="rm-staff" data-id="${esc(m.id)}">Remove</button>`}</div></div>`).join('')}</div></div>`:''}
     <div class="card"><h2 style="margin-bottom:8px">CSV import format</h2>
       <p class="small muted">On the Products page, Import CSV accepts these columns (first row is the header). Brand, variant (flavour) and size drive the Grouped view. Rows with a barcode/SKU that already exists update that product.</p>
@@ -1180,7 +1180,7 @@ document.addEventListener('click', e => {
     case 'clear-sample': guarded(clearSample); break;
     case 'load-sample': guarded(async()=>{ if(!(await confirmBox('Load example data?','Adds 26 example products, 3 customers and two weeks of sales, all marked as examples so you can clear them later.','Load example data'))) return; await loadSampleInto(db); toast('Example data loaded.'); }); break;
     case 'sign-out': FB && FB.signOut(FB.auth).then(()=>location.reload()); break;
-    case 'add-staff': guarded(async()=>{ const em = $('#staff-email').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Enter a valid Google email address.', true); return; } await db.doc('staff/'+em).set({role:'staff', name:$('#staff-name').value.trim(), added:Date.now(), addedBy:S.email}); $('#staff-email').value=''; $('#staff-name').value=''; toast(em+' can now sign in.'); }); break;
+    case 'add-staff': guarded(async()=>{ const em = $('#staff-email').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Enter a valid email address.', true); return; } await db.doc('staff/'+em).set({role:'staff', name:$('#staff-name').value.trim(), added:Date.now(), addedBy:S.email}); $('#staff-email').value=''; $('#staff-name').value=''; toast(em+' added. Make sure they also have a login under Firebase › Authentication › Users.'); }); break;
     case 'rm-staff': guarded(async()=>{ if(!(await confirmBox('Remove staff member?', esc(id)+' will lose access straight away.', 'Remove', true))) return; await db.doc('staff/'+id).delete(); toast('Access removed.'); }); break;
     case 'copy-template': copyText('name,sku,category,brand,variant,size,unit,cost,price,stock,reorder,leadDays,supplier,tracksExpiry\nCaptain Morgan Spiced Gold 750ml,SP-001,Spirits,Captain Morgan,Spiced Gold,750ml,bottle,1450,1750,12,4,3,Spirits distributor,no\n', 'Template copied. Paste into Excel and save as CSV.'); break;
   }
@@ -1366,92 +1366,83 @@ function FireDB(F, fs){
   return { doc:docRef, collection:coll };
 }
 function gate(inner){ document.body.innerHTML = `<div class="gate"><div class="box">${inner}</div></div><div id="modal-root"></div>`; }
-const GLOGO = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
-/* ---- Sign-in. Popup only: the redirect flow breaks on github.io in current mobile browsers. Email link is the fallback. ---- */
-const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok|MicroMessenger|; wv\)/i.test(navigator.userAgent);
-const IS_ANDROID = /Android/i.test(navigator.userAgent);
-const IS_IOS_APP = window.navigator.standalone === true;
+/* ---- Sign-in: email + password. Works the same in every browser and in the installed phone app. ---- */
 const AUTH_MSG = {
-  'auth/unauthorized-domain': () => 'This site address is not allowed to sign in yet. In Firebase console › Authentication › Settings › Authorized domains, add '+location.hostname+'.',
-  'auth/popup-blocked': () => 'Your browser blocked the Google sign-in window. Allow pop-ups for this site, then tap the button again. Or use the email link below.',
-  'auth/operation-not-supported-in-this-environment': () => 'Google sign-in can\'t open in this browser. Open the page in Chrome or Safari, or use the email link below.',
-  'auth/network-request-failed': () => 'No internet connection. Connect and try again.',
-  'auth/web-storage-unsupported': () => 'This browser is blocking storage (private mode or strict settings). Use a normal Chrome or Safari window.',
-  'auth/operation-not-allowed': () => 'This sign-in method is not switched on in Firebase. The owner needs to enable it under Authentication › Sign-in method.',
-  'auth/invalid-action-code': () => 'That sign-in link has expired or was already used. Request a new one.',
-  'auth/too-many-requests': () => 'Too many attempts. Wait a few minutes and try again.',
-  'auth/invalid-credential': () => 'Google sign-in was refused by Firebase. Check that googleClientId in firebase-config.js is the Web client ID shown under Authentication › Sign-in method › Google › Web SDK configuration.'
+  'auth/invalid-credential': 'Wrong email or password. Check them, or tap "Forgot password".',
+  'auth/wrong-password': 'Wrong email or password. Check them, or tap "Forgot password".',
+  'auth/user-not-found': 'No account with that email. Ask the shop owner to create one.',
+  'auth/invalid-email': 'That email address doesn\'t look right.',
+  'auth/email-already-in-use': 'An account with this email already exists. Sign in instead, or reset the password.',
+  'auth/weak-password': 'Use a password with at least 6 characters.',
+  'auth/missing-password': 'Enter your password.',
+  'auth/network-request-failed': 'No internet connection. Connect and try again.',
+  'auth/too-many-requests': 'Too many attempts. Wait a few minutes, or reset your password.',
+  'auth/user-disabled': 'This account has been disabled. Ask the shop owner.',
+  'auth/operation-not-allowed': 'Email sign-in is not switched on. In Firebase console › Authentication › Sign-in method, enable Email/Password.',
+  'auth/unauthorized-domain': 'This site address is not allowed yet. In Firebase › Authentication › Settings › Authorized domains, add '+location.hostname+'.'
 };
-const authMsg = e => (AUTH_MSG[e && e.code] ? AUTH_MSG[e.code]() : 'Sign-in failed ('+((e && e.code) || 'unknown')+'). Try the email link below.');
-/* Google Identity Services: signs in on accounts.google.com directly, then hands the token to Firebase.
-   This avoids the firebaseapp.com hand-off page that phone browsers block for github.io sites. */
-let gisReady = null;
-function loadGIS(){
-  if(!gisReady) gisReady = new Promise((res, rej) => {
-    if(window.google && google.accounts && google.accounts.id) return res();
-    const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
-    sc.onload = () => res(); sc.onerror = () => { gisReady = null; rej(new Error('gis-load')); }; document.head.appendChild(sc);
-    setTimeout(()=>rej(new Error('gis-timeout')), 12000);
-  });
-  return gisReady;
-}
-async function mountGIS(){
-  const cid0 = (window.FIREBASE_CONFIG||{}).googleClientId; const cid = cid0 && !/^0{6}/.test(cid0) ? cid0 : null; const box = $('#gsi-btn'); if(!cid || !box) return false;
-  try{ await loadGIS(); }catch(e){ console.warn(e); return false; }
-  if(!$('#gsi-btn')) return false;
-  google.accounts.id.initialize({ client_id: cid, ux_mode: 'popup', auto_select: false, use_fedcm_for_prompt: true, itp_support: true,
-    callback: async r => {
-      try{ await FB.signInWithCredential(FB.auth, FB.GoogleAuthProvider.credential(r.credential)); }
-      catch(e){ console.warn(e); showSignIn(authMsg(e)); }
-    } });
-  box.innerHTML = '';
-  google.accounts.id.renderButton(box, { type:'standard', theme:'outline', size:'large', text:'signin_with', shape:'rectangular', logo_alignment:'center', width: Math.min(400, Math.max(240, box.offsetWidth||300)) });
-  $('#g-in').classList.add('hide');
-  return true;
-}
-function showSignIn(msg, info){
-  const here = location.href.split('#')[0].split('?')[0];
-  const chromeIntent = 'intent://' + here.replace(/^https?:\/\//,'') + '#Intent;scheme=https;package=com.android.chrome;end';
-  gate(`<h1>Duka Stock Manager</h1><p>Sign in with the Google account your shop owner approved.</p>
-    ${IN_APP?`<div class="banner warn" style="margin:0;flex-direction:column;align-items:flex-start"><b>You opened this inside another app (WhatsApp, Facebook…).</b><span>Google does not allow sign-in here. Open the page in ${IS_ANDROID?'Chrome':'Safari'}.</span><span class="row">${IS_ANDROID?`<a class="btn sm" href="${esc(chromeIntent)}">Open in Chrome</a>`:''}<button class="btn sm" id="copy-link">Copy link</button></span></div>`:''}
-    ${IS_IOS_APP?`<div class="banner info" style="margin:0">If Google sign-in doesn't come back to the app, use the email link below, or sign in once in Safari first.</div>`:''}
-    ${msg?`<div class="banner bad" style="margin:0">${esc(msg)}</div>`:''}
-    ${info?`<div class="banner info" style="margin:0">${esc(info)}</div>`:''}
-    <div id="gsi-btn" style="display:flex;justify-content:center;min-height:${(window.FIREBASE_CONFIG||{}).googleClientId?'44px':'0'}"></div>
-    <button class="gbtn" id="g-in">${GLOGO} Sign in with Google</button>
-    <div class="row" style="gap:8px;align-items:center;color:var(--muted);font-size:13px"><span style="flex:1;height:1px;background:var(--line)"></span>or<span style="flex:1;height:1px;background:var(--line)"></span></div>
-    <form id="el-form" class="grid" style="gap:8px"><label class="small muted" for="el-email">Get a one-time sign-in link by email (works on any phone)</label>
-      <div class="row" style="flex-wrap:nowrap"><input type="text" id="el-email" inputmode="email" autocomplete="email" placeholder="your@gmail.com"><button class="btn" type="submit">Send link</button></div></form>`);
-  mountGIS();
-  const cl = $('#copy-link'); if(cl) cl.onclick = () => copyText(here, 'Link copied. Paste it into '+(IS_ANDROID?'Chrome':'Safari')+'.');
-  $('#g-in').onclick = async () => {
-    const prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({prompt:'select_account'});
-    try{ await FB.signInWithPopup(FB.auth, prov); }
-    catch(e){ console.warn(e); if(e.code!=='auth/popup-closed-by-user' && e.code!=='auth/cancelled-popup-request') showSignIn(authMsg(e)); }
-  };
-  $('#el-form').onsubmit = async ev => {
-    ev.preventDefault(); const em = $('#el-email').value.trim().toLowerCase();
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ showSignIn('Enter a valid email address.'); return; }
-    try{
-      await FB.sendSignInLinkToEmail(FB.auth, em, { url: here, handleCodeInApp: true });
-      try{ localStorage.setItem('duka-signin-email', em); }catch(e){}
-      showSignIn(null, 'Check your email ('+em+') and tap the sign-in link on this phone. Look in Spam or Promotions if it isn\'t in your inbox.');
-    }catch(e){ console.warn(e); showSignIn(authMsg(e)); }
-  };
-}
+const authMsg = e => AUTH_MSG[e && e.code] || ('Something went wrong ('+((e && e.code) || 'unknown')+'). Try again.');
+const validEmail = em => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em);
 let SIGNIN_MSG = null;
-async function finishEmailLink(){
-  if(!FB.isSignInWithEmailLink(FB.auth, location.href)) return;
-  let em = null; try{ em = localStorage.getItem('duka-signin-email'); }catch(e){}
-  if(!em){
-    em = await new Promise(res=>{
-      gate(`<h1>Confirm your email</h1><p>You opened the sign-in link on a different device or browser. Type the email address you used.</p><form id="ce" class="grid" style="gap:8px"><input type="text" id="ce-email" inputmode="email" placeholder="your@gmail.com"><button class="btn pri" type="submit">Sign in</button></form>`);
-      $('#ce').onsubmit = ev => { ev.preventDefault(); res($('#ce-email').value.trim().toLowerCase()); };
-    });
-  }
-  try{ await FB.signInWithEmailLink(FB.auth, em, location.href); try{ localStorage.removeItem('duka-signin-email'); }catch(e){} }
-  catch(e){ console.warn(e); SIGNIN_MSG = authMsg(e); }
-  history.replaceState(null, '', location.pathname);
+function showSignIn(msg, info, mode='in'){
+  const lastEmail = (()=>{ try{ return localStorage.getItem('duka-email')||''; }catch(e){ return ''; } })();
+  const title = mode==='up' ? 'Create your account' : mode==='reset' ? 'Reset your password' : 'Duka Stock Manager';
+  const lead = mode==='up' ? 'Use the email the shop owner added to the staff list. You\'ll get an email to confirm it.' : mode==='reset' ? 'Enter your email and we\'ll send a link to set a new password.' : 'Sign in with your email and password.';
+  gate(`<h1>${title}</h1><p>${lead}</p>
+    ${msg?`<div class="banner bad" style="margin:0">${esc(msg)}</div>`:''}${info?`<div class="banner info" style="margin:0">${esc(info)}</div>`:''}
+    <form id="auth-form" class="grid" style="gap:12px" novalidate>
+      <div class="field"><label for="au-email">Email</label><input type="text" id="au-email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" value="${esc(lastEmail)}" placeholder="you@example.com"></div>
+      ${mode!=='reset'?`<div class="field"><label for="au-pass">Password</label><input type="password" id="au-pass" autocomplete="${mode==='up'?'new-password':'current-password'}" placeholder="${mode==='up'?'At least 6 characters':''}"></div>`:''}
+      ${mode==='up'?`<div class="field"><label for="au-pass2">Confirm password</label><input type="password" id="au-pass2" autocomplete="new-password"></div>`:''}
+      <label class="chk small"><input type="checkbox" id="au-show"> Show password</label>
+      <button class="btn pri big" type="submit" id="au-go">${mode==='up'?'Create account':mode==='reset'?'Send reset link':'Sign in'}</button>
+    </form>
+    <div class="row small" style="justify-content:space-between">
+      ${mode==='in'?`<span class="muted">No account? Ask the shop owner.</span><button class="btn sm" id="to-reset">Forgot password?</button>`:`<button class="btn sm" id="to-in">Back to sign in</button>`}
+    </div>`);
+  const em = $('#au-email'); (em.value ? ($('#au-pass')||em) : em).focus();
+  const sh = $('#au-show'); if(mode==='reset') sh.parentElement.classList.add('hide');
+  sh.onchange = () => document.querySelectorAll('#au-pass,#au-pass2').forEach(x=>x.type = sh.checked?'text':'password');
+  const go = (m, i, md) => showSignIn(m, i, md);
+  $('#to-up') && ($('#to-up').onclick = () => go(null, null, 'up'));
+  $('#to-reset') && ($('#to-reset').onclick = () => go(null, null, 'reset'));
+  $('#to-in') && ($('#to-in').onclick = () => go(null, null, 'in'));
+  $('#auth-form').onsubmit = async ev => {
+    ev.preventDefault();
+    const email = $('#au-email').value.trim().toLowerCase(); const pass = $('#au-pass') ? $('#au-pass').value : '';
+    if(!validEmail(email)) return go('Enter a valid email address.', null, mode);
+    try{ localStorage.setItem('duka-email', email); }catch(e){}
+    const btn = $('#au-go'); btn.disabled = true; btn.textContent = 'Please wait…';
+    try{
+      if(mode==='reset'){
+        await FB.sendPasswordResetEmail(FB.auth, email);
+        return go(null, 'If an account exists for '+email+', a reset link is on its way. Check Spam too. Then come back and sign in.', 'in');
+      }
+      if(mode==='up'){
+        if(pass.length < 6) return go('Use a password with at least 6 characters.', null, 'up');
+        if(pass !== $('#au-pass2').value) return go('The two passwords don\'t match.', null, 'up');
+        const cred = await FB.createUserWithEmailAndPassword(FB.auth, email, pass);
+        await FB.sendEmailVerification(cred.user);
+        return; // onAuthStateChanged shows the "confirm your email" screen
+      }
+      if(!pass) return go('Enter your password.', null, 'in');
+      await FB.signInWithEmailAndPassword(FB.auth, email, pass);
+    }catch(e){ console.warn(e); go(authMsg(e), null, mode); }
+  };
+}
+function showVerify(u){
+  gate(`<h1>Confirm your email</h1><p>We sent a link to <b>${esc(u.email)}</b>. Open it to confirm your email, then tap the button below.</p>
+    <p class="small">Can't find it? Check Spam or Promotions.</p>
+    <button class="btn pri big" id="vf-done">I've confirmed my email</button>
+    <div class="row" style="justify-content:space-between"><button class="btn sm" id="vf-resend">Send the email again</button><button class="btn sm" id="vf-out">Use another account</button></div>
+    <div id="vf-msg"></div>`);
+  const say = (t, bad) => { $('#vf-msg').innerHTML = `<div class="banner ${bad?'bad':'info'}" style="margin:0">${esc(t)}</div>`; };
+  $('#vf-done').onclick = async () => {
+    try{ await u.reload(); if(FB.auth.currentUser.emailVerified){ await FB.auth.currentUser.getIdToken(true); location.reload(); } else say('Not confirmed yet. Open the link in the email first, then tap again.', true); }
+    catch(e){ say(authMsg(e), true); }
+  };
+  $('#vf-resend').onclick = async () => { try{ await FB.sendEmailVerification(u); say('Sent again to '+u.email+'.'); }catch(e){ say(authMsg(e), true); } };
+  $('#vf-out').onclick = () => FB.signOut(FB.auth).then(()=>location.reload());
 }
 function showNotApproved(email){
   gate(`<h1>Not approved yet</h1><p>You're signed in as <b>${esc(email)}</b>, but this email isn't on the shop's staff list.</p><p>Ask the owner to add it under <b>Settings › Staff</b>, then reload this page.</p><div class="row"><button class="btn" onclick="location.reload()">Reload</button><button class="btn" id="g-out">Use another account</button></div>`);
@@ -1476,7 +1467,6 @@ async function boot(){
   const auth = Au.getAuth(app);
   FB = { auth, ...Au };
   try{ await Au.setPersistence(auth, Au.browserLocalPersistence); }catch(e){ console.warn(e); }
-  await finishEmailLink();
   let started = false;
   Au.onAuthStateChanged(auth, async u => {
     if(!u){ if(started) location.reload(); else showSignIn(SIGNIN_MSG); return; }
